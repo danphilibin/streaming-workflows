@@ -25,10 +25,17 @@
       },
     ],
   },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WorkflowObject"],
+    },
+  ],
   "rules": [
     {
       "type": "Text",
       "globs": ["**/*.html"],
+      "fallthrough": true,
     },
   ],
 }
