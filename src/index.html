@@ -34,23 +34,54 @@
   </head>
   <body>
     <h1>Workflow Stream Demo</h1>
-    <button id="startBtn">Start Workflow</button>
+    <div>
+      <label for="workflowType">Workflow: </label>
+      <select id="workflowType">
+        <option value="">Loading...</option>
+      </select>
+      <button id="startBtn">Start Workflow</button>
+    </div>
     <div id="status" class="status"></div>
     <div id="messages"></div>
 
     <script>
+      const workflowTypeSelect = document.getElementById("workflowType");
       const startBtn = document.getElementById("startBtn");
       const statusDiv = document.getElementById("status");
       const messagesDiv = document.getElementById("messages");
 
+      // Load available workflows
+      (async () => {
+        try {
+          const response = await fetch("/workflows");
+          const { workflows } = await response.json();
+          workflowTypeSelect.innerHTML = workflows
+            .map((type) => `<option value="${type}">${type}</option>`)
+            .join("");
+        } catch (error) {
+          workflowTypeSelect.innerHTML =
+            '<option value="">Error loading workflows</option>';
+        }
+      })();
+
       startBtn.addEventListener("click", async () => {
+        const workflowType = workflowTypeSelect.value;
+        if (!workflowType) {
+          statusDiv.textContent = "Please select a workflow type";
+          return;
+        }
+
         startBtn.disabled = true;
         messagesDiv.innerHTML = "";
-        statusDiv.textContent = "Creating workflow...";
+        statusDiv.textContent = `Creating ${workflowType} workflow...`;
 
         try {
           // Create workflow
-          const response = await fetch("/workflow", { method: "POST" });
+          const response = await fetch("/workflow", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: workflowType, params: {} }),
+          });
           const { id, streamUrl } = await response.json();
 
           statusDiv.textContent = `Workflow ${id} started. Connecting to stream...`;

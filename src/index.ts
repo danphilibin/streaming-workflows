@@ -1,60 +1,31 @@
 import { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
 import { RelayWorkflowEntrypoint } from "./relay";
 import { WorkflowObject } from "./workflow-object";
+import { workflows } from "./workflows";
 import html from "./index.html";
 
 // Export the Durable Object
 export { WorkflowObject };
 
-/**
- * Welcome to Cloudflare Workers! This is your first Workflows application.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your Workflow in action
- * - Run `npm run deploy` to publish your application
- *
- * Learn more at https://developers.cloudflare.com/workflows
- */
-
-// User-defined params passed to your Workflow
+// Params passed to workflows
 type Params = {
-  email: string;
-  metadata: Record<string, string>;
+  type: string;
+  params?: any;
 };
 
 export class RelayWorkflow extends RelayWorkflowEntrypoint<Env, Params> {
   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
     this.initRelay(event.instanceId, this.env.WORKFLOW_OBJECT);
-    await this.relay.write("Workflow started");
 
-    const files = await step.do("fetch files", async () => {
-      await this.relay.write("Fetching files from API...");
-      const files = [
-        "doc_7392_rev3.pdf",
-        "report_x29_final.pdf",
-        "memo_2024_05_12.pdf",
-        "file_089_update.pdf",
-        "proj_alpha_v2.pdf",
-        "data_analysis_q2.pdf",
-        "notes_meeting_52.pdf",
-        "summary_fy24_draft.pdf",
-      ];
-      await this.relay.write(`Found ${files.length} files`);
-      return files;
-    });
+    const { type, params } = event.payload;
+    const handler = workflows[type];
 
-    await step.sleep("pause", "3 seconds");
-    await this.relay.write("Starting file processing...");
-
-    for (let i = 0; i < files.length; i++) {
-      await step.do(`process file ${i}`, async () => {
-        await this.relay.write(`Processing ${files[i]}...`);
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        await this.relay.write(`✓ Completed ${files[i]}`);
-      });
+    if (!handler) {
+      await this.relay.write(`Error: Unknown workflow type: ${type}`);
+      throw new Error(`Unknown workflow type: ${type}`);
     }
 
-    await this.relay.write("Workflow completed successfully!");
+    await handler({ step, relay: this.relay, params });
   }
 }
 
@@ -81,12 +52,25 @@ export default {
       return stub.fetch("http://internal/stream");
     }
 
+    // GET /workflows - list available workflows
+    if (req.method === "GET" && url.pathname === "/workflows") {
+      const { getWorkflowTypes } = await import("./workflows");
+      return Response.json({ workflows: getWorkflowTypes() });
+    }
+
     // POST /workflow - spawn a new workflow instance
     if (req.method === "POST" && url.pathname === "/workflow") {
-      const instance = await env.RELAY_WORKFLOW.create();
+      const body = await req.json<{ type: string; params?: any }>();
+      const instance = await env.RELAY_WORKFLOW.create({
+        params: {
+          type: body.type,
+          params: body.params || {},
+        },
+      });
       return Response.json({
         id: instance.id,
         streamUrl: `/stream/${instance.id}`,
+        type: body.type,
       });
     }
 

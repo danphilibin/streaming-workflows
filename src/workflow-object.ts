@@ -4,7 +4,6 @@ import { DurableObject } from "cloudflare:workers";
  * Durable Object that stores and streams messages for a workflow run
  */
 export class WorkflowObject extends DurableObject {
-  private messages: string[] = [];
   private controllers: ReadableStreamDefaultController<Uint8Array>[] = [];
 
   async fetch(request: Request): Promise<Response> {
@@ -13,7 +12,14 @@ export class WorkflowObject extends DurableObject {
     // POST /write - append a message
     if (request.method === "POST" && url.pathname === "/write") {
       const { message } = await request.json<{ message: string }>();
-      this.messages.push(message);
+
+      // Read existing messages from durable storage
+      const messages =
+        (await this.ctx.storage.get<string[]>("messages")) || [];
+      messages.push(message);
+
+      // Persist to durable storage
+      await this.ctx.storage.put("messages", messages);
 
       // Broadcast to all connected clients
       const encoded = new TextEncoder().encode(
@@ -34,9 +40,13 @@ export class WorkflowObject extends DurableObject {
     if (request.method === "GET" && url.pathname === "/stream") {
       const self = this;
       const stream = new ReadableStream({
-        start(controller) {
+        async start(controller) {
+          // Read historical messages from durable storage
+          const messages =
+            (await self.ctx.storage.get<string[]>("messages")) || [];
+
           // Send all historical messages
-          for (const message of self.messages) {
+          for (const message of messages) {
             const encoded = new TextEncoder().encode(
               JSON.stringify({ text: message }) + "\n",
             );
