@@ -12,7 +12,7 @@
   },
   "workflows": [
     {
-      "name": "workflow-workflows-starter",
+      "name": "relay-workflow-prototype",
       "binding": "RELAY_WORKFLOW",
       "class_name": "RelayWorkflow",
     },
