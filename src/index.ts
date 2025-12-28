@@ -1,11 +1,11 @@
 import { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
 import { RelayWorkflowEntrypoint } from "./relay";
-import { WorkflowObject } from "./workflow-object";
+import { RelayDurableObject } from "./workflow-object";
 import { workflows } from "./workflows";
 import html from "./index.html";
 
 // Export the Durable Object
-export { WorkflowObject };
+export { RelayDurableObject };
 
 // Params passed to workflows
 type Params = {
@@ -15,7 +15,7 @@ type Params = {
 
 export class RelayWorkflow extends RelayWorkflowEntrypoint<Env, Params> {
   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
-    this.initRelay(event.instanceId, this.env.WORKFLOW_OBJECT, step);
+    this.initRelay(event.instanceId, this.env.RELAY_DURABLE_OBJECT, step);
 
     const { type, params } = event.payload;
     const handler = workflows[type];
@@ -48,7 +48,7 @@ export default {
     const streamMatch = url.pathname.match(/^\/stream\/(.+)$/);
     if (streamMatch) {
       const workflowId = streamMatch[1];
-      const stub = env.WORKFLOW_OBJECT.getByName(workflowId);
+      const stub = env.RELAY_DURABLE_OBJECT.getByName(workflowId);
       return stub.fetch("http://internal/stream");
     }
 

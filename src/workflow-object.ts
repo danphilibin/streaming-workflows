@@ -4,7 +4,7 @@ import { StreamMessage } from "./stream-message";
 /**
  * Durable Object that stores and streams messages for a workflow run
  */
-export class WorkflowObject extends DurableObject {
+export class RelayDurableObject extends DurableObject {
   private controllers: ReadableStreamDefaultController<Uint8Array>[] = [];
 
   async fetch(request: Request): Promise<Response> {

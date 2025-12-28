@@ -20,15 +20,15 @@
   "durable_objects": {
     "bindings": [
       {
-        "name": "WORKFLOW_OBJECT",
-        "class_name": "WorkflowObject",
+        "name": "RELAY_DURABLE_OBJECT",
+        "class_name": "RelayDurableObject",
       },
     ],
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["WorkflowObject"],
+      "new_sqlite_classes": ["RelayDurableObject"],
     },
   ],
   "rules": [
