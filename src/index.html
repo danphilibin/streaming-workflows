@@ -40,6 +40,7 @@
         <option value="">Loading...</option>
       </select>
       <button id="startBtn">Start Workflow</button>
+      <button id="resetBtn">Reset</button>
     </div>
     <div id="status" class="status"></div>
     <div id="messages"></div>
@@ -47,6 +48,7 @@
     <script>
       const workflowTypeSelect = document.getElementById("workflowType");
       const startBtn = document.getElementById("startBtn");
+      const resetBtn = document.getElementById("resetBtn");
       const statusDiv = document.getElementById("status");
       const messagesDiv = document.getElementById("messages");
 
@@ -77,44 +79,21 @@
         }
       };
 
-      // Load available workflows
-      (async () => {
-        try {
-          const response = await fetch("/workflows");
-          const { workflows } = await response.json();
-          workflowTypeSelect.innerHTML = workflows
-            .map((type) => `<option value="${type}">${type}</option>`)
-            .join("");
-        } catch (error) {
-          workflowTypeSelect.innerHTML =
-            '<option value="">Error loading workflows</option>';
-        }
-      })();
-
-      startBtn.addEventListener("click", async () => {
-        const workflowType = workflowTypeSelect.value;
-        if (!workflowType) {
-          statusDiv.textContent = "Please select a workflow type";
-          return;
-        }
-
+      // Function to connect to a workflow stream
+      async function connectToStream(workflowId) {
         startBtn.disabled = true;
+        workflowTypeSelect.disabled = true;
         messagesDiv.innerHTML = "";
-        statusDiv.textContent = `Creating ${workflowType} workflow...`;
+        statusDiv.textContent = `Connecting to stream...`;
+
+        // Update URL
+        const url = new URL(window.location);
+        url.searchParams.set("workflowId", workflowId);
+        window.history.pushState({}, "", url);
 
         try {
-          // Create workflow
-          const response = await fetch("/workflow", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ type: workflowType, params: {} }),
-          });
-          const { id, streamUrl } = await response.json();
-
-          statusDiv.textContent = `Workflow ${id} started. Connecting to stream...`;
-
           // Connect to stream
-          const streamResponse = await fetch(streamUrl);
+          const streamResponse = await fetch(`/stream/${workflowId}`);
           const reader = streamResponse.body.getReader();
           const decoder = new TextDecoder();
 
@@ -129,9 +108,15 @@
             const lines = chunk.split("\n").filter((line) => line.trim());
 
             for (const line of lines) {
+              let message;
               try {
-                const message = JSON.parse(line);
+                message = JSON.parse(line);
+              } catch (e) {
+                console.error("Failed to parse JSON:", line, e);
+                continue;
+              }
 
+              try {
                 if (message.type === "log") {
                   // Regular log message
                   const msgEl = document.createElement("div");
@@ -142,13 +127,33 @@
                   // Input request - show input field
                   const inputContainer = document.createElement("div");
                   inputContainer.className = "message";
-                  inputContainer.innerHTML = `
-                    <div style="margin: 10px 0; padding: 10px; background: #e3f2fd; border-radius: 4px;">
-                      <div style="margin-bottom: 5px;">${message.prompt}</div>
-                      <input type="text" id="input-${message.eventName}" style="padding: 5px; width: 200px;" />
-                      <button onclick="submitInput('${message.eventName}', '${id}')" style="padding: 5px 10px; margin-left: 5px;">Submit</button>
-                    </div>
-                  `;
+
+                  const wrapper = document.createElement("div");
+                  wrapper.style.margin = "10px 0";
+                  wrapper.style.padding = "10px";
+                  wrapper.style.background = "#e3f2fd";
+                  wrapper.style.borderRadius = "4px";
+
+                  const promptDiv = document.createElement("div");
+                  promptDiv.style.marginBottom = "5px";
+                  promptDiv.textContent = message.prompt;
+
+                  const input = document.createElement("input");
+                  input.type = "text";
+                  input.id = `input-${message.eventName}`;
+                  input.style.padding = "5px";
+                  input.style.width = "200px";
+
+                  const button = document.createElement("button");
+                  button.textContent = "Submit";
+                  button.style.padding = "5px 10px";
+                  button.style.marginLeft = "5px";
+                  button.onclick = () => submitInput(message.eventName, workflowId);
+
+                  wrapper.appendChild(promptDiv);
+                  wrapper.appendChild(input);
+                  wrapper.appendChild(button);
+                  inputContainer.appendChild(wrapper);
                   messagesDiv.appendChild(inputContainer);
                 } else if (message.type === "input_received") {
                   // Show input that was received
@@ -159,7 +164,7 @@
                   messagesDiv.appendChild(msgEl);
                 }
               } catch (e) {
-                console.error("Failed to parse:", line);
+                console.error("Failed to handle message:", message, e);
               }
             }
           }
@@ -169,7 +174,61 @@
           statusDiv.textContent = `Error: ${error.message}`;
         } finally {
           startBtn.disabled = false;
+          workflowTypeSelect.disabled = false;
         }
+      }
+
+      // Load available workflows
+      (async () => {
+        try {
+          const response = await fetch("/workflows");
+          const { workflows } = await response.json();
+          workflowTypeSelect.innerHTML = workflows
+            .map((type) => `<option value="${type}">${type}</option>`)
+            .join("");
+
+          // Check if there's a workflow ID in the URL
+          const urlParams = new URLSearchParams(window.location.search);
+          const workflowId = urlParams.get("workflowId");
+          if (workflowId) {
+            // Resume existing workflow
+            connectToStream(workflowId);
+          }
+        } catch (error) {
+          workflowTypeSelect.innerHTML =
+            '<option value="">Error loading workflows</option>';
+        }
+      })();
+
+      // Start workflow button
+      startBtn.addEventListener("click", async () => {
+        const workflowType = workflowTypeSelect.value;
+        if (!workflowType) {
+          statusDiv.textContent = "Please select a workflow type";
+          return;
+        }
+
+        statusDiv.textContent = `Creating ${workflowType} workflow...`;
+
+        try {
+          // Create workflow
+          const response = await fetch("/workflow", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: workflowType, params: {} }),
+          });
+          const { id } = await response.json();
+
+          // Connect to the stream
+          await connectToStream(id);
+        } catch (error) {
+          statusDiv.textContent = `Error: ${error.message}`;
+        }
+      });
+
+      // Reset button
+      resetBtn.addEventListener("click", () => {
+        window.location.href = "/";
       });
     </script>
   </body>

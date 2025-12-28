@@ -1,4 +1,8 @@
-import { WorkflowEntrypoint, DurableObject } from "cloudflare:workers";
+import {
+  WorkflowEntrypoint,
+  DurableObject,
+  WorkflowStep,
+} from "cloudflare:workers";
 import {
   StreamMessage,
   createLogMessage,
@@ -14,12 +18,15 @@ export class RelayWorkflowEntrypoint<Env, Params> extends WorkflowEntrypoint<
 > {
   protected stream: DurableObjectStub | null = null;
   protected instanceId: string | null = null;
+  protected workflowStep: WorkflowStep | null = null;
 
   protected initRelay<T extends DurableObject>(
     instanceId: string,
     namespace: DurableObjectNamespace<T>,
+    step: WorkflowStep,
   ) {
     this.instanceId = instanceId;
+    this.workflowStep = step;
     const id = namespace.idFromName(instanceId);
     this.stream = namespace.get(id);
   }
@@ -41,15 +48,25 @@ export class RelayWorkflowEntrypoint<Env, Params> extends WorkflowEntrypoint<
       await this.sendMessage(createLogMessage(text));
     },
 
-    requestInput: async (prompt: string): Promise<string> => {
+    input: async (prompt: string): Promise<string> => {
+      if (!this.workflowStep) {
+        throw new Error("Relay not initialized. Call initRelay() first.");
+      }
+
       // Generate unique event name
       const eventName = `input-${crypto.randomUUID()}`;
 
       // Send input request to stream
       await this.sendMessage(createInputRequest(eventName, prompt));
 
-      // Return the event name so caller can wait for it
-      return eventName;
+      // Wait for the user to respond
+      const event = await this.workflowStep.waitForEvent(eventName, {
+        type: eventName,
+        timeout: "5 minutes",
+      });
+
+      // Return the payload as a string
+      return event.payload as string;
     },
   };
 }

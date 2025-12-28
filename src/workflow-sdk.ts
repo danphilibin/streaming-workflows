@@ -4,7 +4,7 @@ export type WorkflowContext = {
   step: WorkflowStep;
   relay: {
     write: (msg: string) => Promise<void>;
-    requestInput: (prompt: string) => Promise<string>;
+    input: (prompt: string) => Promise<string>;
   };
   params: any;
 };

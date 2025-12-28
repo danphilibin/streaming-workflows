@@ -15,7 +15,7 @@ type Params = {
 
 export class RelayWorkflow extends RelayWorkflowEntrypoint<Env, Params> {
   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
-    this.initRelay(event.instanceId, this.env.WORKFLOW_OBJECT);
+    this.initRelay(event.instanceId, this.env.WORKFLOW_OBJECT, step);
 
     const { type, params } = event.payload;
     const handler = workflows[type];
