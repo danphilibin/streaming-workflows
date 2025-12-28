@@ -1,5 +1,9 @@
 import { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
 import { RelayWorkflowEntrypoint } from "./relay";
+import { WorkflowObject } from "./workflow-object";
+
+// Export the Durable Object
+export { WorkflowObject };
 
 /**
  * Welcome to Cloudflare Workers! This is your first Workflows application.
@@ -17,94 +21,68 @@ type Params = {
   metadata: Record<string, string>;
 };
 
-export class MyWorkflow extends RelayWorkflowEntrypoint<Env, Params> {
+export class RelayWorkflow extends RelayWorkflowEntrypoint<Env, Params> {
   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
-    // Can access bindings on `this.env`
-    // Can access params on `event.payload`
+    this.initRelay(event.instanceId, this.env.WORKFLOW_OBJECT);
+    await this.relay.write("Workflow started");
 
-    const files = await step.do("my first step", async () => {
-      // Fetch a list of files from $SOME_SERVICE
-      return {
-        inputParams: event,
-        string: this.getString(),
-        files: [
-          "doc_7392_rev3.pdf",
-          "report_x29_final.pdf",
-          "memo_2024_05_12.pdf",
-          "file_089_update.pdf",
-          "proj_alpha_v2.pdf",
-          "data_analysis_q2.pdf",
-          "notes_meeting_52.pdf",
-          "summary_fy24_draft.pdf",
-        ],
-      };
+    const files = await step.do("fetch files", async () => {
+      await this.relay.write("Fetching files from API...");
+      const files = [
+        "doc_7392_rev3.pdf",
+        "report_x29_final.pdf",
+        "memo_2024_05_12.pdf",
+        "file_089_update.pdf",
+        "proj_alpha_v2.pdf",
+        "data_analysis_q2.pdf",
+        "notes_meeting_52.pdf",
+        "summary_fy24_draft.pdf",
+      ];
+      await this.relay.write(`Found ${files.length} files`);
+      return files;
     });
 
-    // You can optionally have a Workflow wait for additional data,
-    // human approval or an external webhook or HTTP request, before progressing.
-    // You can submit data via HTTP POST to /accounts/{account_id}/workflows/{workflow_name}/instances/{instance_id}/events/{eventName}
-    const waitForApproval = await step.waitForEvent("request-approval", {
-      type: "approval", // define an optional key to switch on
-      timeout: "1 minute", // keep it short for the example!
-    });
+    await step.sleep("pause", "3 seconds");
+    await this.relay.write("Starting file processing...");
 
-    const apiResponse = await step.do("some other step", async () => {
-      let resp = await fetch("https://api.cloudflare.com/client/v4/ips");
-      return await resp.json<any>();
-    });
+    for (let i = 0; i < files.length; i++) {
+      await step.do(`process file ${i}`, async () => {
+        await this.relay.write(`Processing ${files[i]}...`);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        await this.relay.write(`✓ Completed ${files[i]}`);
+      });
+    }
 
-    await step.sleep("wait on something", "1 minute");
-
-    await step.do(
-      "make a call to write that could maybe, just might, fail",
-      // Define a retry strategy
-      {
-        retries: {
-          limit: 5,
-          delay: "5 second",
-          backoff: "exponential",
-        },
-        timeout: "15 minutes",
-      },
-      async () => {
-        // Do stuff here, with access to the state from our previous steps
-        if (Math.random() > 0.5) {
-          throw new Error("API call to $STORAGE_SYSTEM failed");
-        }
-      },
-    );
+    await this.relay.write("Workflow completed successfully!");
   }
 }
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
-    let url = new URL(req.url);
+    const url = new URL(req.url);
 
     if (url.pathname.startsWith("/favicon")) {
       return Response.json({}, { status: 404 });
     }
 
-    // Get the status of an existing instance, if provided
-    // GET /?instanceId=<id here>
-    let id = url.searchParams.get("instanceId");
-    if (id) {
-      let instance = await env.RELAY_WORKFLOW.get(id);
+    // GET /stream/:id - connect to workflow stream
+    const streamMatch = url.pathname.match(/^\/stream\/(.+)$/);
+    if (streamMatch) {
+      const workflowId = streamMatch[1];
+      const stub = env.WORKFLOW_OBJECT.getByName(workflowId);
+      return stub.fetch("http://internal/stream");
+    }
+
+    // POST /workflow - spawn a new workflow instance
+    if (req.method === "POST" && url.pathname === "/workflow") {
+      const instance = await env.RELAY_WORKFLOW.create();
       return Response.json({
-        status: await instance.status(),
+        id: instance.id,
+        streamUrl: `/stream/${instance.id}`,
       });
     }
 
-    // Spawn a new instance and return the ID and status
-    let instance = await env.RELAY_WORKFLOW.create();
-    // You can also set the ID to match an ID in your own system
-    // and pass an optional payload to the Workflow
-    // let instance = await env.RELAY_WORKFLOW.create({
-    // 	id: 'id-from-your-system',
-    // 	params: { payload: 'to send' },
-    // });
-    return Response.json({
-      id: instance.id,
-      details: await instance.status(),
-    });
+    // Default: return OK for any other requests
+    return new Response("OK", { status: 200 });
   },
 };

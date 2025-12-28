@@ -17,4 +17,12 @@
       "class_name": "RelayWorkflow",
     },
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WORKFLOW_OBJECT",
+        "class_name": "WorkflowObject",
+      },
+    ],
+  },
 }
