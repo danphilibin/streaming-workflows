@@ -74,6 +74,23 @@ export default {
       });
     }
 
+    // POST /workflow/:id/event/:name - submit event to workflow
+    const eventMatch = url.pathname.match(
+      /^\/workflow\/([^/]+)\/event\/([^/]+)$/,
+    );
+    if (req.method === "POST" && eventMatch) {
+      const [, instanceId, eventName] = eventMatch;
+      const body = await req.json<{ value: any }>();
+
+      const instance = await env.RELAY_WORKFLOW.get(instanceId);
+      await instance.sendEvent({
+        type: eventName,
+        payload: body.value,
+      });
+
+      return Response.json({ success: true });
+    }
+
     // Default: return OK for any other requests
     return new Response("OK", { status: 200 });
   },

@@ -4,7 +4,8 @@
       "WebSearch",
       "Bash(pnpm dev)",
       "Bash(curl:*)",
-      "Bash(pnpm run typecheck:*)"
+      "Bash(pnpm run typecheck:*)",
+      "WebFetch(domain:developers.cloudflare.com)"
     ]
   }
 }

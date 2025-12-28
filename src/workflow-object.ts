@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { StreamMessage } from "./stream-message";
 
 /**
  * Durable Object that stores and streams messages for a workflow run
@@ -11,20 +12,18 @@ export class WorkflowObject extends DurableObject {
 
     // POST /write - append a message
     if (request.method === "POST" && url.pathname === "/write") {
-      const { message } = await request.json<{ message: string }>();
+      const { message } = await request.json<{ message: StreamMessage }>();
 
       // Read existing messages from durable storage
       const messages =
-        (await this.ctx.storage.get<string[]>("messages")) || [];
+        (await this.ctx.storage.get<StreamMessage[]>("messages")) || [];
       messages.push(message);
 
       // Persist to durable storage
       await this.ctx.storage.put("messages", messages);
 
       // Broadcast to all connected clients
-      const encoded = new TextEncoder().encode(
-        JSON.stringify({ text: message }) + "\n",
-      );
+      const encoded = new TextEncoder().encode(JSON.stringify(message) + "\n");
       for (const controller of this.controllers) {
         try {
           controller.enqueue(encoded);
@@ -43,12 +42,12 @@ export class WorkflowObject extends DurableObject {
         async start(controller) {
           // Read historical messages from durable storage
           const messages =
-            (await self.ctx.storage.get<string[]>("messages")) || [];
+            (await self.ctx.storage.get<StreamMessage[]>("messages")) || [];
 
           // Send all historical messages
           for (const message of messages) {
             const encoded = new TextEncoder().encode(
-              JSON.stringify({ text: message }) + "\n",
+              JSON.stringify(message) + "\n",
             );
             controller.enqueue(encoded);
           }

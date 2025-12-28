@@ -50,6 +50,33 @@
       const statusDiv = document.getElementById("status");
       const messagesDiv = document.getElementById("messages");
 
+      // Global function to submit input
+      window.submitInput = async (eventName, workflowId) => {
+        const inputEl = document.getElementById(`input-${eventName}`);
+        const value = inputEl.value;
+
+        if (!value) {
+          alert("Please enter a value");
+          return;
+        }
+
+        // Disable input
+        inputEl.disabled = true;
+        inputEl.parentElement.querySelector("button").disabled = true;
+
+        // Submit event to workflow
+        try {
+          await fetch(`/workflow/${workflowId}/event/${eventName}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ value }),
+          });
+        } catch (error) {
+          console.error("Failed to submit input:", error);
+          alert("Failed to submit input");
+        }
+      };
+
       // Load available workflows
       (async () => {
         try {
@@ -103,11 +130,34 @@
 
             for (const line of lines) {
               try {
-                const { text } = JSON.parse(line);
-                const msgEl = document.createElement("div");
-                msgEl.className = "message";
-                msgEl.textContent = text;
-                messagesDiv.appendChild(msgEl);
+                const message = JSON.parse(line);
+
+                if (message.type === "log") {
+                  // Regular log message
+                  const msgEl = document.createElement("div");
+                  msgEl.className = "message";
+                  msgEl.textContent = message.text;
+                  messagesDiv.appendChild(msgEl);
+                } else if (message.type === "input_request") {
+                  // Input request - show input field
+                  const inputContainer = document.createElement("div");
+                  inputContainer.className = "message";
+                  inputContainer.innerHTML = `
+                    <div style="margin: 10px 0; padding: 10px; background: #e3f2fd; border-radius: 4px;">
+                      <div style="margin-bottom: 5px;">${message.prompt}</div>
+                      <input type="text" id="input-${message.eventName}" style="padding: 5px; width: 200px;" />
+                      <button onclick="submitInput('${message.eventName}', '${id}')" style="padding: 5px 10px; margin-left: 5px;">Submit</button>
+                    </div>
+                  `;
+                  messagesDiv.appendChild(inputContainer);
+                } else if (message.type === "input_received") {
+                  // Show input that was received
+                  const msgEl = document.createElement("div");
+                  msgEl.className = "message";
+                  msgEl.textContent = `> ${message.value}`;
+                  msgEl.style.color = "#666";
+                  messagesDiv.appendChild(msgEl);
+                }
               } catch (e) {
                 console.error("Failed to parse:", line);
               }
