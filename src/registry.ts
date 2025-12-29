@@ -1,9 +1,9 @@
 import { fetchHackernews } from "../workflows/fetch-hackernews";
 import { processFiles } from "../workflows/process-files";
 import { askName } from "../workflows/ask-name";
-import { WorkflowHandler } from "./workflow-sdk";
+import { ActionRegistry } from "./sdk/types";
 
-export const workflows: Record<string, WorkflowHandler> = {
+export const workflows: ActionRegistry = {
   "fetch-hackernews": fetchHackernews,
   "process-files": processFiles,
   "ask-name": askName,

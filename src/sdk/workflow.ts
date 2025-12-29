@@ -1,34 +1,36 @@
 import {
   WorkflowEntrypoint,
-  DurableObject,
+  WorkflowEvent,
   WorkflowStep,
 } from "cloudflare:workers";
-import {
-  StreamMessage,
-  createLogMessage,
-  createInputRequest,
-} from "./stream-message";
+import { workflows } from "../registry";
+import { createInputRequest, createLogMessage, StreamMessage } from "./stream";
 
-/**
- * Extended WorkflowEntrypoint that provides Relay functionality
- */
-export class RelayWorkflowEntrypoint<Env, Params> extends WorkflowEntrypoint<
-  Env,
-  Params
-> {
+// Params passed to workflows
+type WorkflowParams = {
+  type: string;
+  params?: any;
+};
+
+export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
   protected stream: DurableObjectStub | null = null;
-  protected instanceId: string | null = null;
-  protected workflowStep: WorkflowStep | null = null;
+  protected step: WorkflowStep | null = null;
 
-  protected initRelay<T extends DurableObject>(
-    instanceId: string,
-    namespace: DurableObjectNamespace<T>,
-    step: WorkflowStep,
-  ) {
-    this.instanceId = instanceId;
-    this.workflowStep = step;
-    const id = namespace.idFromName(instanceId);
-    this.stream = namespace.get(id);
+  async run(event: WorkflowEvent<WorkflowParams>, step: WorkflowStep) {
+    this.step = step;
+
+    // Durable Objects are named using the workflow's instance ID
+    this.stream = this.env.RELAY_DURABLE_OBJECT.getByName(event.instanceId);
+
+    const { type, params } = event.payload;
+    const handler = workflows[type];
+
+    if (!handler) {
+      await this.relay.output(`Error: Unknown workflow type: ${type}`);
+      throw new Error(`Unknown workflow type: ${type}`);
+    }
+
+    await handler({ step, relay: this.relay, params });
   }
 
   private async sendMessage(message: StreamMessage): Promise<void> {
@@ -43,13 +45,14 @@ export class RelayWorkflowEntrypoint<Env, Params> extends WorkflowEntrypoint<
     });
   }
 
+  // Public "SDK" methods for interacting with the workflow
   relay = {
     output: async (text: string): Promise<void> => {
       await this.sendMessage(createLogMessage(text));
     },
 
     input: async (prompt: string): Promise<string> => {
-      if (!this.workflowStep) {
+      if (!this.step) {
         throw new Error("Relay not initialized. Call initRelay() first.");
       }
 
@@ -60,7 +63,7 @@ export class RelayWorkflowEntrypoint<Env, Params> extends WorkflowEntrypoint<
       await this.sendMessage(createInputRequest(eventName, prompt));
 
       // Wait for the user to respond
-      const event = await this.workflowStep.waitForEvent(eventName, {
+      const event = await this.step.waitForEvent(eventName, {
         type: eventName,
         timeout: "5 minutes",
       });

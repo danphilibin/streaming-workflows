@@ -1,6 +1,6 @@
-import { defineWorkflow } from "../src/workflow-sdk";
+import { createAction } from "../src/sdk/types";
 
-export const processFiles = defineWorkflow(async ({ step, relay, params }) => {
+export const processFiles = createAction(async ({ step, relay }) => {
   await relay.output("Workflow started");
 
   const files = await step.do("fetch files", async () => {
