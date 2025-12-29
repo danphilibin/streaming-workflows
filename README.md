@@ -1,6 +1,6 @@
 # Cloudflare Durable Objects + Workflows Prototype
 
-Prototype of connecting [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/) to [Cloudflare Workflows](https://developers.cloudflare.com/workflows/) to give each workflow a persistent readable stream, similar to [Vercel Workflow](https://useworkflow.dev/docs/foundations/streaming).
+Prototype of connecting [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/) to [Cloudflare Workflows](https://developers.cloudflare.com/workflows/) to give each workflow a persistent writable stream, similar to [Vercel Workflow](https://useworkflow.dev/docs/foundations/streaming).
 
 ## How to run
 
