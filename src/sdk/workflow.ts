@@ -49,10 +49,21 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
     });
   }
 
+  // Counter for generating unique step names
+  private outputCounter = 0;
+  private inputCounter = 0;
+
   // Public "SDK" methods for interacting with the workflow
   relay = {
     output: async (text: string): Promise<void> => {
-      await this.sendMessage(createLogMessage(text));
+      if (!this.step) {
+        throw new Error("Relay not initialized. Call initRelay() first.");
+      }
+
+      const stepName = `relay-output-${this.outputCounter++}`;
+      await this.step.do(stepName, async () => {
+        await this.sendMessage(createLogMessage(text));
+      });
     },
 
     input: async (prompt: string): Promise<string> => {
@@ -60,11 +71,13 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
         throw new Error("Relay not initialized. Call initRelay() first.");
       }
 
-      // Generate unique event name
-      const eventName = `input-${crypto.randomUUID()}`;
+      // Generate unique event name based on counter for deterministic naming
+      const eventName = `input-${this.inputCounter++}`;
 
-      // Send input request to stream
-      await this.sendMessage(createInputRequest(eventName, prompt));
+      // Send input request inside a step (idempotent on replay)
+      await this.step.do(`relay-input-request-${eventName}`, async () => {
+        await this.sendMessage(createInputRequest(eventName, prompt));
+      });
 
       // Wait for the user to respond
       const event = await this.step.waitForEvent(eventName, {
