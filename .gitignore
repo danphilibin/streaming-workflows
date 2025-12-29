@@ -5,3 +5,5 @@ worker-configuration.d.ts
 build
 .react-router
 *.tsbuildinfo
+.mcp.json
+settings.local.json
