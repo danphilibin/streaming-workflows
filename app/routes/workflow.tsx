@@ -9,7 +9,12 @@ export function meta({ params }: Route.MetaArgs) {
   ];
 }
 
-type WorkflowStatus = "idle" | "connecting" | "streaming" | "complete" | "error";
+type WorkflowStatus =
+  | "idle"
+  | "connecting"
+  | "streaming"
+  | "complete"
+  | "error";
 
 export default function Workflow() {
   const { workflowName, runId } = useParams();
@@ -53,7 +58,10 @@ export default function Workflow() {
         if ((error as Error).name !== "AbortError") {
           setStatus("error");
           setMessages([
-            <div key="error" className="py-3 text-base text-[#666] flex items-center gap-2">
+            <div
+              key="error"
+              className="py-3 text-base text-[#666] flex items-center gap-2"
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
               Error: {(error as Error).message}
             </div>,
@@ -69,21 +77,48 @@ export default function Workflow() {
     };
   }, [workflowName, runId, navigate]);
 
-  async function submitInput(eventName: string, workflowId: string) {
-    const inputEl = document.getElementById(
-      `input-${eventName}`,
-    ) as HTMLInputElement;
-    const value = inputEl?.value;
+  async function submitInput(
+    eventName: string,
+    workflowId: string,
+    schema?: Record<string, { type: string }>,
+  ) {
+    const formContainer = document.getElementById(`form-${eventName}`);
+    if (!formContainer) return;
 
-    if (!value) {
-      return;
+    let value: string | Record<string, unknown>;
+
+    if (schema) {
+      // Collect all field values into an object
+      const result: Record<string, unknown> = {};
+      for (const [fieldName, fieldDef] of Object.entries(schema)) {
+        const input = document.getElementById(
+          `input-${eventName}-${fieldName}`,
+        ) as HTMLInputElement;
+        if (input) {
+          if (fieldDef.type === "checkbox") {
+            result[fieldName] = input.checked;
+          } else if (fieldDef.type === "number") {
+            result[fieldName] = input.value ? Number(input.value) : 0;
+          } else {
+            result[fieldName] = input.value;
+          }
+        }
+      }
+      value = result;
+    } else {
+      // Simple string input
+      const inputEl = document.getElementById(
+        `input-${eventName}`,
+      ) as HTMLInputElement;
+      if (!inputEl?.value) return;
+      value = inputEl.value;
     }
 
-    inputEl.disabled = true;
-    const button = inputEl.parentElement?.querySelector("button");
-    if (button) {
-      (button as HTMLButtonElement).disabled = true;
-    }
+    // Disable all inputs and button
+    const inputs = formContainer.querySelectorAll("input");
+    inputs.forEach((input) => (input.disabled = true));
+    const button = formContainer.querySelector("button");
+    if (button) button.disabled = true;
 
     try {
       await fetch(`/workflow/${workflowId}/event/${eventName}`, {
@@ -134,22 +169,118 @@ export default function Workflow() {
             if (message.type === "log") {
               setMessages((prev) => [
                 ...prev,
-                <div key={prev.length} className="py-3 text-base leading-relaxed text-[#888]">
+                <div
+                  key={prev.length}
+                  className="py-3 text-base leading-relaxed text-[#888]"
+                >
                   {message.text}
                 </div>,
               ]);
             } else if (message.type === "input_request") {
+              const schema = message.schema as
+                | Record<
+                    string,
+                    {
+                      type: string;
+                      label: string;
+                      placeholder?: string;
+                      options?: { value: string; label: string }[];
+                    }
+                  >
+                | undefined;
+
               setMessages((prev) => [
                 ...prev,
                 <div
                   key={prev.length}
+                  id={`form-${message.eventName}`}
                   className="my-4 p-5 rounded-xl border bg-[#111] border-[#222]"
                 >
                   <div className="flex flex-col gap-4">
-                    <label className="flex flex-col gap-2">
-                      <span className="text-base font-medium text-[#fafafa]">
-                        {message.prompt}
-                      </span>
+                    <span className="text-base font-medium text-[#fafafa]">
+                      {message.prompt}
+                    </span>
+                    {schema ? (
+                      // Render schema-based fields
+                      Object.entries(schema).map(([fieldName, fieldDef]) => {
+                        if (fieldDef.type === "checkbox") {
+                          return (
+                            <label
+                              key={fieldName}
+                              className="flex items-center gap-3 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                id={`input-${message.eventName}-${fieldName}`}
+                                className="w-4 h-4 rounded border-[#333] bg-black text-white focus:ring-white/20 focus:ring-offset-0"
+                              />
+                              <span className="text-sm text-[#ccc]">
+                                {fieldDef.label}
+                              </span>
+                            </label>
+                          );
+                        } else if (fieldDef.type === "number") {
+                          return (
+                            <label
+                              key={fieldName}
+                              className="flex flex-col gap-2"
+                            >
+                              <span className="text-sm text-[#888]">
+                                {fieldDef.label}
+                              </span>
+                              <input
+                                type="number"
+                                id={`input-${message.eventName}-${fieldName}`}
+                                data-1p-ignore
+                                placeholder={fieldDef.placeholder || ""}
+                                className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] placeholder:text-[#666] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
+                              />
+                            </label>
+                          );
+                        } else if (fieldDef.type === "select") {
+                          return (
+                            <label
+                              key={fieldName}
+                              className="flex flex-col gap-2"
+                            >
+                              <span className="text-sm text-[#888]">
+                                {fieldDef.label}
+                              </span>
+                              <select
+                                id={`input-${message.eventName}-${fieldName}`}
+                                className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
+                              >
+                                {fieldDef.options?.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          );
+                        } else {
+                          // Default to text input
+                          return (
+                            <label
+                              key={fieldName}
+                              className="flex flex-col gap-2"
+                            >
+                              <span className="text-sm text-[#888]">
+                                {fieldDef.label}
+                              </span>
+                              <input
+                                type="text"
+                                id={`input-${message.eventName}-${fieldName}`}
+                                data-1p-ignore
+                                placeholder={fieldDef.placeholder || ""}
+                                className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] placeholder:text-[#666] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
+                              />
+                            </label>
+                          );
+                        }
+                      })
+                    ) : (
+                      // Simple text input (no schema)
                       <input
                         type="text"
                         id={`input-${message.eventName}`}
@@ -162,10 +293,12 @@ export default function Workflow() {
                           }
                         }}
                       />
-                    </label>
+                    )}
                     <div className="flex gap-2">
                       <button
-                        onClick={() => submitInput(message.eventName, workflowId)}
+                        onClick={() =>
+                          submitInput(message.eventName, workflowId, schema)
+                        }
                         className="px-3.5 py-2 text-[15px] font-medium bg-white text-black rounded-md hover:opacity-90 active:scale-[0.98] disabled:bg-[#333] disabled:text-[#666] disabled:cursor-default transition-all"
                       >
                         Continue
@@ -175,10 +308,20 @@ export default function Workflow() {
                 </div>,
               ]);
             } else if (message.type === "input_received") {
+              const displayValue =
+                typeof message.value === "object"
+                  ? Object.entries(message.value as Record<string, unknown>)
+                      .map(([k, v]) => `${k}: ${v}`)
+                      .join(", ")
+                  : message.value;
+
               setMessages((prev) => [
                 ...prev,
-                <div key={prev.length} className="py-3 text-base leading-relaxed text-[#888]">
-                  <span className="text-[#666]">&gt;</span> {message.value}
+                <div
+                  key={prev.length}
+                  className="py-3 text-base leading-relaxed text-[#888]"
+                >
+                  <span className="text-[#666]">&gt;</span> {displayValue}
                 </div>,
               ]);
             }

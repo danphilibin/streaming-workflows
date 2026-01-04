@@ -8,6 +8,8 @@ import {
   createInputRequest,
   createLogMessage,
   type StreamMessage,
+  type InputSchema,
+  type InferInputResult,
 } from "./stream";
 
 // Params passed to workflows
@@ -17,12 +19,23 @@ type WorkflowParams = {
 };
 
 /**
+ * Input function type with overloads for simple and structured inputs
+ */
+export type RelayInputFn = {
+  (prompt: string): Promise<string>;
+  <T extends InputSchema>(
+    prompt: string,
+    schema: T,
+  ): Promise<InferInputResult<T>>;
+};
+
+/**
  * Context passed to workflow handlers.
  * Use `input` and `output` to interact with the user.
  */
 export type RelayContext = {
   step: WorkflowStep;
-  input: RelayWorkflow["input"];
+  input: RelayInputFn;
   output: RelayWorkflow["output"];
   params: any;
 };
@@ -84,8 +97,9 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
 
   /**
    * Request input from the user and wait for a response.
+   * Supports simple string prompts or structured input with a schema.
    */
-  input = async (prompt: string): Promise<string> => {
+  input: RelayInputFn = (async (prompt: string, schema?: InputSchema) => {
     if (!this.step) {
       throw new Error("Relay not initialized. Call initRelay() first.");
     }
@@ -95,7 +109,7 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
 
     // Send input request inside a step (idempotent on replay)
     await this.step.do(`relay-input-request-${eventName}`, async () => {
-      await this.sendMessage(createInputRequest(eventName, prompt));
+      await this.sendMessage(createInputRequest(eventName, prompt, schema));
     });
 
     // Wait for the user to respond
@@ -104,7 +118,7 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
       timeout: "5 minutes",
     });
 
-    // Return the payload as a string
-    return event.payload as string;
-  };
+    // Return the payload - either a string or structured object based on schema
+    return event.payload;
+  }) as RelayInputFn;
 }
