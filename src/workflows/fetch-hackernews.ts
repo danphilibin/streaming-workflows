@@ -1,4 +1,4 @@
-import type { RelayContext } from "../src/sdk/workflow";
+import type { RelayContext } from "@/sdk/workflow";
 
 export const fetchHackernews = async ({ step, output }: RelayContext) => {
   await output("Fetching top Hacker News posts...");

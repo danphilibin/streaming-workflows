@@ -1,4 +1,4 @@
-import type { RelayContext } from "../src/sdk/workflow";
+import type { RelayContext } from "@/sdk/workflow";
 
 export const askName = async ({ input, output }: RelayContext) => {
   await output("Hello! I'd like to get to know you.");
