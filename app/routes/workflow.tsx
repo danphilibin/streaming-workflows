@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState, type JSX } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useEffect, useRef } from "react";
+import { useParams } from "react-router";
 import type { Route } from "./+types/workflow";
+import { useWorkflowStream } from "../hooks/useWorkflowStream";
+import { MessageList } from "../components/workflow";
 
 export function meta({ params }: Route.MetaArgs) {
   return [
@@ -9,19 +11,15 @@ export function meta({ params }: Route.MetaArgs) {
   ];
 }
 
-type WorkflowStatus =
-  | "idle"
-  | "connecting"
-  | "streaming"
-  | "complete"
-  | "error";
-
 export default function Workflow() {
   const { workflowName, runId } = useParams();
-  const navigate = useNavigate();
-  const [status, setStatus] = useState<WorkflowStatus>("idle");
-  const [messages, setMessages] = useState<JSX.Element[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const { status, messages, currentRunId, submitInput, startNewRun } =
+    useWorkflowStream({
+      workflowName: workflowName!,
+      runId,
+    });
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -29,395 +27,6 @@ export default function Workflow() {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [messages]);
-
-  useEffect(() => {
-    const abortController = new AbortController();
-
-    async function initWorkflow() {
-      setMessages([]);
-      setStatus("connecting");
-
-      try {
-        let currentRunId = runId;
-
-        // Create new run if no runId
-        if (!currentRunId) {
-          const response = await fetch("/workflow", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ type: workflowName, params: {} }),
-            signal: abortController.signal,
-          });
-          const data = (await response.json()) as { id: string };
-          currentRunId = data.id;
-          navigate(`/${workflowName}/${currentRunId}`, { replace: true });
-        }
-
-        await connectToStream(currentRunId, abortController.signal);
-      } catch (error) {
-        if ((error as Error).name !== "AbortError") {
-          setStatus("error");
-          setMessages([
-            <div
-              key="error"
-              className="py-3 text-base text-[#666] flex items-center gap-2"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-              Error: {(error as Error).message}
-            </div>,
-          ]);
-        }
-      }
-    }
-
-    initWorkflow();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [workflowName, runId, navigate]);
-
-  async function submitInput(
-    eventName: string,
-    workflowId: string,
-    schema?: Record<string, { type: string }>,
-  ) {
-    const formContainer = document.getElementById(`form-${eventName}`);
-    if (!formContainer) return;
-
-    let value: string | Record<string, unknown>;
-
-    if (schema) {
-      // Collect all field values into an object
-      const result: Record<string, unknown> = {};
-      for (const [fieldName, fieldDef] of Object.entries(schema)) {
-        const input = document.getElementById(
-          `input-${eventName}-${fieldName}`,
-        ) as HTMLInputElement;
-        if (input) {
-          if (fieldDef.type === "checkbox") {
-            result[fieldName] = input.checked;
-          } else if (fieldDef.type === "number") {
-            result[fieldName] = input.value ? Number(input.value) : 0;
-          } else {
-            result[fieldName] = input.value;
-          }
-        }
-      }
-      value = result;
-    } else {
-      // Simple string input
-      const inputEl = document.getElementById(
-        `input-${eventName}`,
-      ) as HTMLInputElement;
-      if (!inputEl?.value) return;
-      value = inputEl.value;
-    }
-
-    // Disable all inputs and button
-    const inputs = formContainer.querySelectorAll("input");
-    inputs.forEach((input) => (input.disabled = true));
-    const button = formContainer.querySelector("button");
-    if (button) button.disabled = true;
-
-    try {
-      await fetch(`/workflow/${workflowId}/event/${eventName}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value }),
-      });
-    } catch (error) {
-      console.error("Failed to submit input:", error);
-    }
-  }
-
-  async function connectToStream(workflowId: string, signal: AbortSignal) {
-    try {
-      const streamResponse = await fetch(`/stream/${workflowId}`, { signal });
-      const reader = streamResponse.body?.getReader();
-      if (!reader) throw new Error("No reader available");
-
-      const decoder = new TextDecoder();
-      setStatus("streaming");
-
-      let buffer = "";
-
-      while (true) {
-        if (signal.aborted) {
-          reader.cancel();
-          break;
-        }
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-
-          let message;
-          try {
-            message = JSON.parse(line);
-          } catch (e) {
-            console.error("Failed to parse JSON:", line, e);
-            continue;
-          }
-
-          try {
-            if (message.type === "log") {
-              setMessages((prev) => [
-                ...prev,
-                <div
-                  key={prev.length}
-                  className="py-3 text-base leading-relaxed text-[#888]"
-                >
-                  {message.text}
-                </div>,
-              ]);
-            } else if (message.type === "input_request") {
-              const schema = message.schema as
-                | Record<
-                    string,
-                    {
-                      type: string;
-                      label: string;
-                      placeholder?: string;
-                      options?: { value: string; label: string }[];
-                    }
-                  >
-                | undefined;
-
-              setMessages((prev) => [
-                ...prev,
-                <div
-                  key={prev.length}
-                  id={`form-${message.eventName}`}
-                  className="my-4 p-5 rounded-xl border bg-[#111] border-[#222]"
-                >
-                  <div className="flex flex-col gap-4">
-                    <span className="text-base font-medium text-[#fafafa]">
-                      {message.prompt}
-                    </span>
-                    {schema ? (
-                      // Render schema-based fields
-                      (() => {
-                        // Find the first text input field name (text type or default, excluding checkbox/number/select)
-                        const firstTextFieldName = Object.entries(schema).find(
-                          ([, fieldDef]) =>
-                            fieldDef.type === "text" ||
-                            !fieldDef.type ||
-                            (fieldDef.type !== "checkbox" &&
-                              fieldDef.type !== "number" &&
-                              fieldDef.type !== "select"),
-                        )?.[0];
-
-                        return Object.entries(schema).map(
-                          ([fieldName, fieldDef]) => {
-                            const isFirstTextInput =
-                              fieldName === firstTextFieldName &&
-                              (fieldDef.type === "text" ||
-                                !fieldDef.type ||
-                                (fieldDef.type !== "checkbox" &&
-                                  fieldDef.type !== "number" &&
-                                  fieldDef.type !== "select"));
-
-                            if (fieldDef.type === "checkbox") {
-                              return (
-                                <label
-                                  key={fieldName}
-                                  className="flex items-center gap-3 cursor-pointer"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    id={`input-${message.eventName}-${fieldName}`}
-                                    className="w-4 h-4 rounded border-[#333] bg-black text-white focus:ring-white/20 focus:ring-offset-0"
-                                  />
-                                  <span className="text-sm text-[#ccc]">
-                                    {fieldDef.label}
-                                  </span>
-                                </label>
-                              );
-                            } else if (fieldDef.type === "number") {
-                              return (
-                                <label
-                                  key={fieldName}
-                                  className="flex flex-col gap-2"
-                                >
-                                  <span className="text-sm text-[#888]">
-                                    {fieldDef.label}
-                                  </span>
-                                  <input
-                                    type="number"
-                                    id={`input-${message.eventName}-${fieldName}`}
-                                    data-1p-ignore
-                                    placeholder={fieldDef.placeholder || ""}
-                                    className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] placeholder:text-[#666] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
-                                  />
-                                </label>
-                              );
-                            } else if (fieldDef.type === "select") {
-                              return (
-                                <label
-                                  key={fieldName}
-                                  className="flex flex-col gap-2"
-                                >
-                                  <span className="text-sm text-[#888]">
-                                    {fieldDef.label}
-                                  </span>
-                                  <select
-                                    id={`input-${message.eventName}-${fieldName}`}
-                                    className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
-                                  >
-                                    {fieldDef.options?.map((opt) => (
-                                      <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                              );
-                            } else {
-                              // Default to text input
-                              return (
-                                <label
-                                  key={fieldName}
-                                  className="flex flex-col gap-2"
-                                >
-                                  <span className="text-sm text-[#888]">
-                                    {fieldDef.label}
-                                  </span>
-                                  <input
-                                    type="text"
-                                    id={`input-${message.eventName}-${fieldName}`}
-                                    data-1p-ignore
-                                    placeholder={fieldDef.placeholder || ""}
-                                    autoFocus={isFirstTextInput}
-                                    className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] placeholder:text-[#666] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
-                                  />
-                                </label>
-                              );
-                            }
-                          },
-                        );
-                      })()
-                    ) : (
-                      // Simple text input (no schema)
-                      <input
-                        type="text"
-                        id={`input-${message.eventName}`}
-                        data-1p-ignore
-                        placeholder="Type here..."
-                        autoFocus
-                        className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] placeholder:text-[#666] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            submitInput(message.eventName, workflowId);
-                          }
-                        }}
-                      />
-                    )}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() =>
-                          submitInput(message.eventName, workflowId, schema)
-                        }
-                        className="px-3.5 py-2 text-[15px] font-medium bg-white text-black rounded-md hover:opacity-90 active:scale-[0.98] disabled:bg-[#333] disabled:text-[#666] disabled:cursor-default transition-all"
-                      >
-                        Continue
-                      </button>
-                    </div>
-                  </div>
-                </div>,
-              ]);
-            } else if (message.type === "input_received") {
-              const displayValue =
-                typeof message.value === "object"
-                  ? Object.entries(message.value as Record<string, unknown>)
-                      .map(([k, v]) => `${k}: ${v}`)
-                      .join(", ")
-                  : message.value;
-
-              setMessages((prev) => [
-                ...prev,
-                <div
-                  key={prev.length}
-                  className="py-3 text-base leading-relaxed text-[#888]"
-                >
-                  <span className="text-[#666]">&gt;</span> {displayValue}
-                </div>,
-              ]);
-            } else if (message.type === "loading_start") {
-              const loadingId = message.id;
-              setMessages((prev) => [
-                ...prev,
-                <div
-                  key={`loading-${loadingId}`}
-                  data-loading-id={loadingId}
-                  className="py-3 text-base leading-relaxed text-[#888] flex items-center gap-2"
-                >
-                  <span className="inline-block w-4 h-4 border-2 border-[#444] border-t-[#888] rounded-full animate-spin" />
-                  {message.text}
-                </div>,
-              ]);
-            } else if (message.type === "loading_complete") {
-              const loadingId = message.id;
-              // Replace the loading element with the completed version
-              setMessages((prev) =>
-                prev.map((el) =>
-                  el.key === `loading-${loadingId}` ? (
-                    <div
-                      key={`loading-${loadingId}`}
-                      className="py-3 text-base leading-relaxed text-[#888] flex items-center gap-2"
-                    >
-                      <svg
-                        className="w-4 h-4 text-green-500"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      {message.text}
-                    </div>
-                  ) : (
-                    el
-                  ),
-                ),
-              );
-            }
-          } catch (e) {
-            console.error("Failed to handle message:", message, e);
-          }
-        }
-      }
-
-      setStatus("complete");
-    } catch (error) {
-      if ((error as Error).name === "AbortError") {
-        return;
-      }
-      throw error;
-    }
-  }
-
-  function formatWorkflowName(name?: string): string {
-    if (!name) return "";
-    return name
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
-  }
-
-  async function startNewRun() {
-    navigate(`/${workflowName}`);
-  }
 
   return (
     <div className="flex h-full w-full">
@@ -445,7 +54,11 @@ export default function Workflow() {
           )}
 
           {/* Messages */}
-          {messages}
+          <MessageList
+            messages={messages}
+            workflowId={currentRunId}
+            onSubmitInput={submitInput}
+          />
 
           {/* Complete state with no messages */}
           {status === "complete" && messages.length === 0 && (
@@ -457,4 +70,12 @@ export default function Workflow() {
       </div>
     </div>
   );
+}
+
+function formatWorkflowName(name?: string): string {
+  if (!name) return "";
+  return name
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
