@@ -49,7 +49,7 @@ export function useWorkflowStream({
           const response = await fetch("/workflow", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ type: workflowName, params: {} }),
+            body: JSON.stringify({ name: workflowName }),
             signal: abortController.signal,
           });
           const data = (await response.json()) as { id: string };

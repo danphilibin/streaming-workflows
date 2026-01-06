@@ -14,9 +14,8 @@ import {
 } from "./stream";
 
 // Params passed to workflows
-type WorkflowParams = {
-  type: string;
-  params?: any;
+export type WorkflowParams = {
+  name: string;
 };
 
 /**
@@ -54,7 +53,6 @@ export type RelayContext = {
   input: RelayInputFn;
   output: RelayWorkflow["output"];
   loading: RelayLoadingFn;
-  params: any;
 };
 
 export type RelayHandler = (ctx: RelayContext) => Promise<void>;
@@ -69,6 +67,10 @@ export function createWorkflow(handler: RelayHandler): RelayHandler {
   return handler;
 }
 
+/**
+ * Workflow entrypoint class that handles the workflow lifecycle.
+ * All workflow functions run through this class.
+ */
 export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
   protected stream: DurableObjectStub | null = null;
   protected step: WorkflowStep | null = null;
@@ -76,15 +78,15 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
   async run(event: WorkflowEvent<WorkflowParams>, step: WorkflowStep) {
     this.step = step;
 
-    // Durable Objects are named using the workflow's instance ID
+    // Each workflow run gets a Durable Object named using workflow's instance ID
     this.stream = this.env.RELAY_DURABLE_OBJECT.getByName(event.instanceId);
 
-    const { type, params } = event.payload;
-    const handler = workflows[type];
+    const { name } = event.payload;
+    const handler = workflows[name];
 
     if (!handler) {
-      await this.output(`Error: Unknown workflow type: ${type}`);
-      throw new Error(`Unknown workflow type: ${type}`);
+      await this.output(`Error: Unknown workflow: ${name}`);
+      throw new Error(`Unknown workflow: ${name}`);
     }
 
     await handler({
@@ -92,7 +94,6 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
       input: this.input,
       output: this.output,
       loading: this.loading,
-      params,
     });
   }
 
@@ -101,7 +102,7 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
       throw new Error("Relay not initialized. Call initRelay() first.");
     }
 
-    await this.stream.fetch("http://internal/write", {
+    await this.stream.fetch("http://internal/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message }),

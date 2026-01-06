@@ -1,3 +1,5 @@
+import { WorkflowParams } from "./workflow";
+
 export const httpHandler = async (req: Request, env: Env) => {
   const url = new URL(req.url);
 
@@ -17,17 +19,14 @@ export const httpHandler = async (req: Request, env: Env) => {
 
   // POST /workflow - spawn a new workflow instance
   if (req.method === "POST" && url.pathname === "/workflow") {
-    const body = await req.json<{ type: string; params?: any }>();
+    const body = await req.json<WorkflowParams>();
     const instance = await env.RELAY_WORKFLOW.create({
-      params: {
-        type: body.type,
-        params: body.params || {},
-      },
+      params: { name: body.name },
     });
     return Response.json({
       id: instance.id,
       streamUrl: `/stream/${instance.id}`,
-      type: body.type,
+      name: body.name,
     });
   }
 
@@ -41,7 +40,7 @@ export const httpHandler = async (req: Request, env: Env) => {
 
     // Write input_received to the stream
     const stub = env.RELAY_DURABLE_OBJECT.getByName(instanceId);
-    await stub.fetch("http://internal/write", {
+    await stub.fetch("http://internal/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

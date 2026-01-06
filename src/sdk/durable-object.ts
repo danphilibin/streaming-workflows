@@ -2,7 +2,11 @@ import { DurableObject } from "cloudflare:workers";
 import { type StreamMessage } from "./stream";
 
 /**
- * Durable Object that stores and streams messages for a workflow run
+ * Durable Object that stores and streams messages for a workflow run.
+ *
+ * Supports two endpoints:
+ * - GET /stream - returns the stream of messages
+ * - POST /stream - appends a message to the stream
  */
 export class RelayDurableObject extends DurableObject {
   private controllers: ReadableStreamDefaultController<Uint8Array>[] = [];
@@ -10,8 +14,8 @@ export class RelayDurableObject extends DurableObject {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // POST /write - append a message
-    if (request.method === "POST" && url.pathname === "/write") {
+    // POST /stream - append a message
+    if (request.method === "POST" && url.pathname === "/stream") {
       const { message } = await request.json<{ message: StreamMessage }>();
 
       // Read existing messages from durable storage
