@@ -3,7 +3,6 @@ import { useNavigate } from "react-router";
 import type {
   WorkflowMessage,
   WorkflowStatus,
-  InputSchema,
   LoadingMessage,
 } from "../types/workflow";
 import { parseStreamMessage } from "../types/workflow";
@@ -17,7 +16,10 @@ interface UseWorkflowStreamResult {
   status: WorkflowStatus;
   messages: WorkflowMessage[];
   currentRunId: string | null;
-  submitInput: (eventName: string, schema?: InputSchema) => Promise<void>;
+  submitInput: (
+    eventName: string,
+    value: string | Record<string, unknown>,
+  ) => Promise<void>;
   startNewRun: () => void;
 }
 
@@ -151,54 +153,17 @@ export function useWorkflowStream({
     }
   }
 
-  async function submitInput(eventName: string, schema?: InputSchema) {
+  async function submitInput(
+    eventName: string,
+    value: string | Record<string, unknown>,
+  ) {
     if (!currentRunId) return;
 
-    const formContainer = document.getElementById(`form-${eventName}`);
-    if (!formContainer) return;
-
-    let value: string | Record<string, unknown>;
-
-    if (schema) {
-      const result: Record<string, unknown> = {};
-      for (const [fieldName, fieldDef] of Object.entries(schema)) {
-        const input = document.getElementById(
-          `input-${eventName}-${fieldName}`,
-        ) as HTMLInputElement;
-        if (input) {
-          if (fieldDef.type === "checkbox") {
-            result[fieldName] = input.checked;
-          } else if (fieldDef.type === "number") {
-            result[fieldName] = input.value ? Number(input.value) : 0;
-          } else {
-            result[fieldName] = input.value;
-          }
-        }
-      }
-      value = result;
-    } else {
-      const inputEl = document.getElementById(
-        `input-${eventName}`,
-      ) as HTMLInputElement;
-      if (!inputEl?.value) return;
-      value = inputEl.value;
-    }
-
-    // Disable all inputs and button
-    const inputs = formContainer.querySelectorAll("input");
-    inputs.forEach((input) => (input.disabled = true));
-    const button = formContainer.querySelector("button");
-    if (button) button.disabled = true;
-
-    try {
-      await fetch(`/workflow/${currentRunId}/event/${eventName}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value }),
-      });
-    } catch (error) {
-      console.error("Failed to submit input:", error);
-    }
+    await fetch(`/workflow/${currentRunId}/event/${eventName}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value }),
+    });
   }
 
   function startNewRun() {

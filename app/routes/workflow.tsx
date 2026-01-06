@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useParams } from "react-router";
 import type { Route } from "./+types/workflow";
 import { useWorkflowStream } from "../hooks/useWorkflowStream";
-import { MessageList } from "../components/workflow";
+import { MessageList } from "../components/workflow/MessageList";
 
 export function meta({ params }: Route.MetaArgs) {
   return [

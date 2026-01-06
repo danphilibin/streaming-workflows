@@ -1,4 +1,4 @@
-import type { WorkflowMessage, InputSchema } from "../../types/workflow";
+import type { WorkflowMessage } from "../../types/workflow";
 import { LogMessage } from "./LogMessage";
 import { InputRequestMessage } from "./InputRequestMessage";
 import { InputReceivedMessage } from "./InputReceivedMessage";
@@ -7,7 +7,10 @@ import { LoadingMessage } from "./LoadingMessage";
 interface MessageListProps {
   messages: WorkflowMessage[];
   workflowId: string | null;
-  onSubmitInput: (eventName: string, schema?: InputSchema) => Promise<void>;
+  onSubmitInput: (
+    eventName: string,
+    value: string | Record<string, unknown>,
+  ) => Promise<void>;
 }
 
 export function MessageList({

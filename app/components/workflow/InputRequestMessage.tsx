@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { InputSchema } from "../../types/workflow";
 
 interface InputRequestMessageProps {
@@ -5,7 +6,10 @@ interface InputRequestMessageProps {
   prompt: string;
   schema?: InputSchema;
   workflowId: string | null;
-  onSubmit: (eventName: string, schema?: InputSchema) => Promise<void>;
+  onSubmit: (
+    eventName: string,
+    value: string | Record<string, unknown>,
+  ) => Promise<void>;
 }
 
 export function InputRequestMessage({
@@ -14,14 +18,39 @@ export function InputRequestMessage({
   schema,
   onSubmit,
 }: InputRequestMessageProps) {
+  const [isSubmitted, setIsSubmitted] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    await onSubmit(eventName, schema);
+    if (isSubmitted) return;
+
+    const formData = new FormData(e.currentTarget);
+    let value: string | Record<string, unknown>;
+
+    if (schema) {
+      const result: Record<string, unknown> = {};
+      for (const [fieldName, fieldDef] of Object.entries(schema)) {
+        if (fieldDef.type === "checkbox") {
+          result[fieldName] = formData.get(fieldName) === "on";
+        } else if (fieldDef.type === "number") {
+          const raw = formData.get(fieldName);
+          result[fieldName] = raw ? Number(raw) : 0;
+        } else {
+          result[fieldName] = formData.get(fieldName) ?? "";
+        }
+      }
+      value = result;
+    } else {
+      value = (formData.get("input") as string) ?? "";
+      if (!value) return;
+    }
+
+    setIsSubmitted(true);
+    await onSubmit(eventName, value);
   };
 
   return (
     <form
-      id={`form-${eventName}`}
       className="my-4 p-5 rounded-xl border bg-[#111] border-[#222]"
       onSubmit={handleSubmit}
     >
@@ -29,14 +58,15 @@ export function InputRequestMessage({
         <span className="text-base font-medium text-[#fafafa]">{prompt}</span>
 
         {schema ? (
-          <SchemaFields eventName={eventName} schema={schema} />
+          <SchemaFields schema={schema} disabled={isSubmitted} />
         ) : (
           <input
             type="text"
-            id={`input-${eventName}`}
+            name="input"
             data-1p-ignore
             placeholder="Type here..."
             autoFocus
+            disabled={isSubmitted}
             className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] placeholder:text-[#666] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
           />
         )}
@@ -44,6 +74,7 @@ export function InputRequestMessage({
         <div className="flex gap-2">
           <button
             type="submit"
+            disabled={isSubmitted}
             className="px-3.5 py-2 text-[15px] font-medium bg-white text-black rounded-md hover:opacity-90 active:scale-[0.98] disabled:bg-[#333] disabled:text-[#666] disabled:cursor-default transition-all"
           >
             Continue
@@ -55,16 +86,16 @@ export function InputRequestMessage({
 }
 
 interface SchemaFieldsProps {
-  eventName: string;
   schema: InputSchema;
+  disabled: boolean;
 }
 
-function SchemaFields({ eventName, schema }: SchemaFieldsProps) {
-  // Find the first text input field name
+function SchemaFields({ schema, disabled }: SchemaFieldsProps) {
+  // Find the first text input field name for autofocus
   const firstTextFieldName = Object.entries(schema).find(
     ([, fieldDef]) =>
-      fieldDef.type === "text" ||
       !fieldDef.type ||
+      fieldDef.type === "text" ||
       (fieldDef.type !== "checkbox" &&
         fieldDef.type !== "number" &&
         fieldDef.type !== "select"),
@@ -73,11 +104,10 @@ function SchemaFields({ eventName, schema }: SchemaFieldsProps) {
   return (
     <>
       {Object.entries(schema).map(([fieldName, fieldDef]) => {
-        const inputId = `input-${eventName}-${fieldName}`;
         const isFirstTextInput =
           fieldName === firstTextFieldName &&
-          (fieldDef.type === "text" ||
-            !fieldDef.type ||
+          (!fieldDef.type ||
+            fieldDef.type === "text" ||
             (fieldDef.type !== "checkbox" &&
               fieldDef.type !== "number" &&
               fieldDef.type !== "select"));
@@ -90,7 +120,8 @@ function SchemaFields({ eventName, schema }: SchemaFieldsProps) {
             >
               <input
                 type="checkbox"
-                id={inputId}
+                name={fieldName}
+                disabled={disabled}
                 className="w-4 h-4 rounded border-[#333] bg-black text-white focus:ring-white/20 focus:ring-offset-0"
               />
               <span className="text-sm text-[#ccc]">{fieldDef.label}</span>
@@ -104,8 +135,9 @@ function SchemaFields({ eventName, schema }: SchemaFieldsProps) {
               <span className="text-sm text-[#888]">{fieldDef.label}</span>
               <input
                 type="number"
-                id={inputId}
+                name={fieldName}
                 data-1p-ignore
+                disabled={disabled}
                 placeholder={fieldDef.placeholder || ""}
                 className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] placeholder:text-[#666] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
               />
@@ -118,7 +150,8 @@ function SchemaFields({ eventName, schema }: SchemaFieldsProps) {
             <label key={fieldName} className="flex flex-col gap-2">
               <span className="text-sm text-[#888]">{fieldDef.label}</span>
               <select
-                id={inputId}
+                name={fieldName}
+                disabled={disabled}
                 className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
               >
                 {fieldDef.options?.map((opt) => (
@@ -137,8 +170,9 @@ function SchemaFields({ eventName, schema }: SchemaFieldsProps) {
             <span className="text-sm text-[#888]">{fieldDef.label}</span>
             <input
               type="text"
-              id={inputId}
+              name={fieldName}
               data-1p-ignore
+              disabled={disabled}
               placeholder={fieldDef.placeholder || ""}
               autoFocus={isFirstTextInput}
               className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] placeholder:text-[#666] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
