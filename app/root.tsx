@@ -8,7 +8,7 @@ import {
   ScrollRestoration,
 } from "react-router";
 import { useEffect, useState } from "react";
-
+import type { WorkflowMeta } from "@/sdk/utils";
 import type { Route } from "./+types/root";
 import "./app.css";
 
@@ -26,21 +26,14 @@ export const links: Route.LinksFunction = () => [
 ];
 
 function Sidebar() {
-  const [workflows, setWorkflows] = useState<string[]>([]);
+  const [workflows, setWorkflows] = useState<WorkflowMeta[]>([]);
 
   useEffect(() => {
     fetch("/workflows")
-      .then((res) => res.json() as Promise<{ workflows: string[] }>)
+      .then((res) => res.json() as Promise<{ workflows: WorkflowMeta[] }>)
       .then((data) => setWorkflows(data.workflows))
       .catch((err) => console.error("Failed to load workflows:", err));
   }, []);
-
-  function formatWorkflowName(name: string): string {
-    return name
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
-  }
 
   return (
     <div className="w-[260px] bg-[#0a0a0a] border-r border-[#222] flex flex-col">
@@ -55,8 +48,8 @@ function Sidebar() {
       <div className="flex-1 overflow-y-auto p-3">
         {workflows.map((workflow) => (
           <NavLink
-            key={workflow}
-            to={`/${workflow}`}
+            key={workflow.slug}
+            to={`/${workflow.slug}`}
             className={({ isActive }) =>
               `block w-full text-left px-3.5 py-3 rounded-md mb-1 transition-colors ${
                 isActive
@@ -65,9 +58,7 @@ function Sidebar() {
               }`
             }
           >
-            <div className="font-medium text-sm">
-              {formatWorkflowName(workflow)}
-            </div>
+            <div className="font-medium text-sm">{workflow.title}</div>
           </NavLink>
         ))}
       </div>
