@@ -32,7 +32,6 @@ export default function Workflow() {
     <div className="flex h-full w-full">
       <div ref={containerRef} className="flex-1 overflow-y-auto">
         <div className="max-w-[640px] p-8">
-          {/* Header */}
           <div className="mb-6 flex items-center justify-between">
             <h1 className="text-xl font-semibold text-[#fafafa]">
               {formatWorkflowName(workflowName)}
@@ -45,29 +44,42 @@ export default function Workflow() {
             </button>
           </div>
 
-          {/* Connecting state */}
           {status === "connecting" && (
-            <div className="py-3 text-base text-[#666] flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#666] animate-pulse-dot" />
-              Connecting...
-            </div>
+            <ConnectionState message="Connecting..." isLoading />
           )}
 
-          {/* Messages */}
+          {status === "streaming" && messages.length === 0 && (
+            <ConnectionState message="Waiting for workflow..." isLoading />
+          )}
+
           <MessageList
             messages={messages}
             workflowId={currentRunId}
             onSubmitInput={submitInput}
           />
 
-          {/* Complete state with no messages */}
           {status === "complete" && messages.length === 0 && (
-            <div className="py-3 text-base text-[#666]">
-              No messages received.
-            </div>
+            <ConnectionState message="No messages received." />
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ConnectionState({
+  message,
+  isLoading,
+}: {
+  message: string;
+  isLoading?: boolean;
+}) {
+  return (
+    <div className="py-3 text-base text-[#666] flex items-center gap-2">
+      {isLoading && (
+        <span className="w-1.5 h-1.5 rounded-full bg-[#666] animate-pulse-dot" />
+      )}
+      {message}
     </div>
   );
 }
