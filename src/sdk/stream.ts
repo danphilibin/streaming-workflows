@@ -80,12 +80,12 @@ export const InputRequestMessageSchema = z.object({
   type: z.literal("input_request"),
   eventName: z.string(),
   prompt: z.string(),
-  schema: InputSchemaSchema.optional(),
+  schema: InputSchemaSchema,
 });
 
 export const InputReceivedMessageSchema = z.object({
   type: z.literal("input_received"),
-  value: z.union([z.string(), z.record(z.string(), z.unknown())]),
+  value: z.record(z.string(), z.unknown()),
 });
 
 export const LoadingMessageSchema = z.object({
@@ -120,14 +120,15 @@ export function createInputRequest(
   prompt: string,
   schema?: InputSchema,
 ): InputRequestMessage {
-  if (schema) {
-    return { type: "input_request", eventName, prompt, schema };
-  }
-  return { type: "input_request", eventName, prompt };
+  // Normalize simple prompts to a single text field schema
+  const normalizedSchema: InputSchema = schema ?? {
+    input: { type: "text", label: prompt },
+  };
+  return { type: "input_request", eventName, prompt, schema: normalizedSchema };
 }
 
 export function createInputReceived(
-  value: string | Record<string, unknown>,
+  value: Record<string, unknown>,
 ): InputReceivedMessage {
   return { type: "input_received", value };
 }

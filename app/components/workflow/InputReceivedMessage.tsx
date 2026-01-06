@@ -1,14 +1,11 @@
 interface InputReceivedMessageProps {
-  value: unknown;
+  value: Record<string, unknown>;
 }
 
 export function InputReceivedMessage({ value }: InputReceivedMessageProps) {
-  const displayValue =
-    typeof value === "object" && value !== null
-      ? Object.entries(value as Record<string, unknown>)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(", ")
-      : String(value);
+  const displayValue = Object.entries(value)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(", ");
 
   return (
     <div className="py-3 text-base leading-relaxed text-[#888]">

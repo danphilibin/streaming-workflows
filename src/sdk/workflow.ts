@@ -150,8 +150,12 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
       timeout: "5 minutes",
     });
 
-    // Return the payload - either a string or structured object based on schema
-    return event.payload;
+    // Unwrap for simple case (no schema provided = normalized to { input: value })
+    const payload = event.payload as Record<string, unknown>;
+    if (!schema) {
+      return payload.input;
+    }
+    return payload;
   }) as RelayInputFn;
 
   /**

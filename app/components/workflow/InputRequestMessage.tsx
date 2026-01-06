@@ -4,11 +4,11 @@ import type { InputSchema } from "../../types/workflow";
 interface InputRequestMessageProps {
   eventName: string;
   prompt: string;
-  schema?: InputSchema;
+  schema: InputSchema;
   workflowId: string | null;
   onSubmit: (
     eventName: string,
-    value: string | Record<string, unknown>,
+    value: Record<string, unknown>,
   ) => Promise<void>;
 }
 
@@ -25,24 +25,17 @@ export function InputRequestMessage({
     if (isSubmitted) return;
 
     const formData = new FormData(e.currentTarget);
-    let value: string | Record<string, unknown>;
+    const value: Record<string, unknown> = {};
 
-    if (schema) {
-      const result: Record<string, unknown> = {};
-      for (const [fieldName, fieldDef] of Object.entries(schema)) {
-        if (fieldDef.type === "checkbox") {
-          result[fieldName] = formData.get(fieldName) === "on";
-        } else if (fieldDef.type === "number") {
-          const raw = formData.get(fieldName);
-          result[fieldName] = raw ? Number(raw) : 0;
-        } else {
-          result[fieldName] = formData.get(fieldName) ?? "";
-        }
+    for (const [fieldName, fieldDef] of Object.entries(schema)) {
+      if (fieldDef.type === "checkbox") {
+        value[fieldName] = formData.get(fieldName) === "on";
+      } else if (fieldDef.type === "number") {
+        const raw = formData.get(fieldName);
+        value[fieldName] = raw ? Number(raw) : 0;
+      } else {
+        value[fieldName] = formData.get(fieldName) ?? "";
       }
-      value = result;
-    } else {
-      value = (formData.get("input") as string) ?? "";
-      if (!value) return;
     }
 
     setIsSubmitted(true);
@@ -57,19 +50,7 @@ export function InputRequestMessage({
       <div className="flex flex-col gap-4">
         <span className="text-base font-medium text-[#fafafa]">{prompt}</span>
 
-        {schema ? (
-          <SchemaFields schema={schema} disabled={isSubmitted} />
-        ) : (
-          <input
-            type="text"
-            name="input"
-            data-1p-ignore
-            placeholder="Type here..."
-            autoFocus
-            disabled={isSubmitted}
-            className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] placeholder:text-[#666] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
-          />
-        )}
+        <SchemaFields schema={schema} disabled={isSubmitted} />
 
         <div className="flex gap-2">
           <button
