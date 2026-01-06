@@ -1,6 +1,6 @@
-import type { RelayContext } from "@/sdk/workflow";
+import { createWorkflow } from "@/sdk/workflow";
 
-export const processFiles = async ({ step, output }: RelayContext) => {
+export const processFiles = createWorkflow(async ({ step, output }) => {
   await output("Workflow started");
   await output("Fetching files from API...");
 
@@ -31,4 +31,4 @@ export const processFiles = async ({ step, output }: RelayContext) => {
   }
 
   await output("Workflow completed successfully!");
-};
+});
