@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { type InputSchema, type NormalizedButton } from "@/sdk";
+import { type InputSchema, type NormalizedButton } from "@/sdk/client";
 
 interface InputRequestMessageProps {
   eventName: string;

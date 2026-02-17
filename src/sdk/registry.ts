@@ -1,5 +1,14 @@
-import { z } from "zod";
 import type { RelayHandler } from "./cf-workflow";
+import {
+  type WorkflowMeta,
+  type WorkflowParams,
+  type StartWorkflowParams,
+  WorkflowParamsSchema,
+  StartWorkflowParamsSchema,
+} from "./registry-types";
+
+export type { WorkflowMeta, WorkflowParams, StartWorkflowParams };
+export { WorkflowParamsSchema, StartWorkflowParamsSchema };
 
 export type WorkflowDefinition = {
   slug: string;
@@ -8,8 +17,6 @@ export type WorkflowDefinition = {
 };
 
 const workflows: Map<string, WorkflowDefinition> = new Map();
-
-export type WorkflowMeta = Pick<WorkflowDefinition, "slug" | "title">;
 
 /**
  * Converts a title to a URL-friendly slug
@@ -39,15 +46,3 @@ export function getWorkflowList(): { slug: string; title: string }[] {
     .sort((a, b) => a.title.localeCompare(b.title));
 }
 
-export const WorkflowParamsSchema = z.object({
-  name: z.string(),
-});
-
-export type WorkflowParams = z.infer<typeof WorkflowParamsSchema>;
-
-export const StartWorkflowParamsSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-});
-
-export type StartWorkflowParams = z.infer<typeof StartWorkflowParamsSchema>;
