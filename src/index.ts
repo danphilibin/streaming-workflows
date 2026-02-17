@@ -13,3 +13,4 @@ import "@/workflows/ask-name";
 import "@/workflows/newsletter-signup";
 import "@/workflows/survey";
 import "@/workflows/approval-test";
+import "@/workflows/refund";
