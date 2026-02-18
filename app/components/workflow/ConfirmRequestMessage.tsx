@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Button } from "@cloudflare/kumo/components/button";
+import { Warning, Check, X } from "@phosphor-icons/react";
 
 interface ConfirmRequestMessageProps {
   eventName: string;
@@ -46,9 +48,9 @@ export function ConfirmRequestMessage({
             }`}
           >
             {approved ? (
-              <CheckIcon className="w-4 h-4 text-white" />
+              <Check size={16} weight="bold" className="text-white" />
             ) : (
-              <XIcon className="w-4 h-4 text-white" />
+              <X size={16} weight="bold" className="text-white" />
             )}
           </div>
           <div className="flex flex-col gap-1">
@@ -70,80 +72,30 @@ export function ConfirmRequestMessage({
       <div className="flex flex-col gap-4">
         <div className="flex items-start gap-3">
           <div className="shrink-0 w-6 h-6 rounded-full bg-amber-600 flex items-center justify-center">
-            <AlertIcon className="w-4 h-4 text-white" />
+            <Warning size={16} weight="bold" className="text-white" />
           </div>
           <span className="text-base font-medium text-[#fafafa]">{message}</span>
         </div>
 
         <div className="flex gap-2 ml-9">
-          <button
+          <Button
             type="button"
             disabled={isSubmitting}
             onClick={() => handleClick(true)}
-            className="px-4 py-2 text-[15px] font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            variant="primary"
           >
             Approve
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={isSubmitting}
             onClick={() => handleClick(false)}
-            className="px-4 py-2 text-[15px] font-medium rounded-md bg-red-600 text-white hover:bg-red-500 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            variant="destructive"
           >
             Reject
-          </button>
+          </Button>
         </div>
       </div>
     </div>
-  );
-}
-
-function AlertIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-      />
-    </svg>
-  );
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2.5}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-    </svg>
-  );
-}
-
-function XIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2.5}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M6 18L18 6M6 6l12 12"
-      />
-    </svg>
   );
 }

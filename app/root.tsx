@@ -68,7 +68,7 @@ function Sidebar() {
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-mode="dark">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -76,7 +76,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        <div className="flex h-screen bg-black text-[#fafafa] font-sans">
+        <div className="flex h-screen bg-kumo-base text-kumo-default font-sans">
           <Sidebar />
           {children}
         </div>

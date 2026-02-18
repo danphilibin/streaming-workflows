@@ -7,3 +7,6 @@ build
 *.tsbuildinfo
 .mcp.json
 settings.local.json
+
+# opensrc - source code for packages
+opensrc/
