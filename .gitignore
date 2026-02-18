@@ -8,3 +8,4 @@ build
 .mcp.json
 settings.local.json
 .dev.vars
+opensrc/

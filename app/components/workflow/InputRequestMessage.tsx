@@ -1,5 +1,9 @@
 import { useState, useRef } from "react";
 import { type InputSchema, type NormalizedButton } from "@/sdk/client";
+import { Button } from "@cloudflare/kumo/components/button";
+import { Input } from "@cloudflare/kumo/components/input";
+import { Checkbox } from "@cloudflare/kumo/components/checkbox";
+import { Select } from "@cloudflare/kumo/components/select";
 
 interface InputRequestMessageProps {
   eventName: string;
@@ -14,10 +18,13 @@ interface InputRequestMessageProps {
   submittedValue?: Record<string, unknown>;
 }
 
-const intentStyles: Record<string, string> = {
-  primary: "bg-white text-black hover:opacity-90",
-  secondary: "bg-[#222] text-[#fafafa] hover:bg-[#333]",
-  danger: "bg-red-600 text-white hover:bg-red-700",
+const intentToVariant: Record<
+  string,
+  "primary" | "secondary" | "destructive"
+> = {
+  primary: "primary",
+  secondary: "secondary",
+  danger: "destructive",
 };
 
 export function InputRequestMessage({
@@ -30,6 +37,9 @@ export function InputRequestMessage({
 }: InputRequestMessageProps) {
   const [isSubmitted, setIsSubmitted] = useState(!!submittedValue);
   const choiceRef = useRef<string | null>(null);
+  // Track select/checkbox values for form submission (Kumo uses Base UI which
+  // may not render native form elements for FormData collection)
+  const controlledValues = useRef<Record<string, unknown>>({});
 
   const collectFormValues = (
     form: HTMLFormElement,
@@ -39,7 +49,9 @@ export function InputRequestMessage({
 
     for (const [fieldName, fieldDef] of Object.entries(schema)) {
       if (fieldDef.type === "checkbox") {
-        value[fieldName] = formData.get(fieldName) === "on";
+        value[fieldName] = controlledValues.current[fieldName] ?? false;
+      } else if (fieldDef.type === "select") {
+        value[fieldName] = controlledValues.current[fieldName] ?? "";
       } else if (fieldDef.type === "number") {
         const raw = formData.get(fieldName);
         value[fieldName] = raw ? Number(raw) : 0;
@@ -88,19 +100,20 @@ export function InputRequestMessage({
           schema={schema}
           disabled={isSubmitted}
           values={submittedValue}
+          controlledValues={controlledValues}
         />
 
         <div className="flex gap-2">
           {buttons.map((btn) => (
-            <button
+            <Button
               key={btn.label}
               type={buttons.length === 1 ? "submit" : "button"}
               disabled={isSubmitted}
               onClick={(e) => handleButtonClick(btn.label, e)}
-              className={`px-3.5 py-2 text-[15px] font-medium rounded-md active:scale-[0.98] disabled:bg-[#333] disabled:text-[#666] disabled:cursor-default transition-all ${intentStyles[btn.intent]}`}
+              variant={intentToVariant[btn.intent] ?? "primary"}
             >
               {btn.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -112,9 +125,15 @@ interface SchemaFieldsProps {
   schema: InputSchema;
   disabled: boolean;
   values?: Record<string, unknown>;
+  controlledValues: React.RefObject<Record<string, unknown>>;
 }
 
-function SchemaFields({ schema, disabled, values }: SchemaFieldsProps) {
+function SchemaFields({
+  schema,
+  disabled,
+  values,
+  controlledValues,
+}: SchemaFieldsProps) {
   // Find the first text input field name for autofocus
   const firstTextFieldName = Object.entries(schema).find(
     ([, fieldDef]) =>
@@ -137,75 +156,86 @@ function SchemaFields({ schema, disabled, values }: SchemaFieldsProps) {
               fieldDef.type !== "select"));
 
         if (fieldDef.type === "checkbox") {
+          // Initialize controlled value from submitted data
+          if (!(fieldName in controlledValues.current)) {
+            controlledValues.current[fieldName] = values?.[fieldName] === true;
+          }
+
           return (
-            <label
+            <Checkbox
               key={fieldName}
-              className="flex items-center gap-3 cursor-pointer"
-            >
-              <input
-                type="checkbox"
-                name={fieldName}
-                disabled={disabled}
-                defaultChecked={values?.[fieldName] === true}
-                className="w-4 h-4 rounded border-[#333] bg-black text-white focus:ring-white/20 focus:ring-offset-0"
-              />
-              <span className="text-sm text-[#ccc]">{fieldDef.label}</span>
-            </label>
+              label={fieldDef.label}
+              name={fieldName}
+              disabled={disabled}
+              checked={values?.[fieldName] === true ? true : undefined}
+              onCheckedChange={(checked) => {
+                controlledValues.current[fieldName] = checked;
+              }}
+            />
           );
         }
 
         if (fieldDef.type === "number") {
           return (
-            <label key={fieldName} className="flex flex-col gap-2">
-              <span className="text-sm text-[#888]">{fieldDef.label}</span>
-              <input
-                type="number"
-                name={fieldName}
-                data-1p-ignore
-                disabled={disabled}
-                defaultValue={values?.[fieldName] as number | undefined}
-                placeholder={fieldDef.placeholder || ""}
-                className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] placeholder:text-[#666] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
-              />
-            </label>
+            <Input
+              key={fieldName}
+              type="number"
+              name={fieldName}
+              label={fieldDef.label}
+              data-1p-ignore
+              disabled={disabled}
+              defaultValue={values?.[fieldName] as number | undefined}
+              placeholder={fieldDef.placeholder || ""}
+            />
           );
         }
 
         if (fieldDef.type === "select") {
+          const defaultVal = values?.[fieldName] as string | undefined;
+          // Initialize controlled value from submitted/default data
+          if (defaultVal !== undefined && !(fieldName in controlledValues.current)) {
+            controlledValues.current[fieldName] = defaultVal;
+          } else if (!(fieldName in controlledValues.current) && fieldDef.options?.length) {
+            controlledValues.current[fieldName] = fieldDef.options[0].value;
+          }
+
           return (
-            <label key={fieldName} className="flex flex-col gap-2">
-              <span className="text-sm text-[#888]">{fieldDef.label}</span>
-              <select
-                name={fieldName}
-                disabled={disabled}
-                defaultValue={values?.[fieldName] as string | undefined}
-                className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
-              >
-                {fieldDef.options?.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <Select
+              key={fieldName}
+              label={fieldDef.label}
+              hideLabel={false}
+              disabled={disabled}
+              defaultValue={defaultVal ?? fieldDef.options?.[0]?.value}
+              renderValue={(value: unknown) => {
+                const opt = fieldDef.options?.find((o) => o.value === value);
+                return opt?.label ?? String(value ?? "");
+              }}
+              onValueChange={(v) => {
+                controlledValues.current[fieldName] = v;
+              }}
+            >
+              {fieldDef.options?.map((opt) => (
+                <Select.Option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </Select.Option>
+              ))}
+            </Select>
           );
         }
 
         // Default: text input
         return (
-          <label key={fieldName} className="flex flex-col gap-2">
-            <span className="text-sm text-[#888]">{fieldDef.label}</span>
-            <input
-              type="text"
-              name={fieldName}
-              data-1p-ignore
-              disabled={disabled}
-              defaultValue={values?.[fieldName] as string | undefined}
-              placeholder={fieldDef.placeholder || ""}
-              autoFocus={isFirstTextInput}
-              className="w-full px-3 py-2.5 text-base bg-black border border-[#333] rounded-md text-[#fafafa] placeholder:text-[#666] focus:outline-none focus:border-[#888] focus:ring-[3px] focus:ring-white/5 disabled:bg-[#0a0a0a] disabled:border-[#222] disabled:text-[#888] transition-all"
-            />
-          </label>
+          <Input
+            key={fieldName}
+            type="text"
+            name={fieldName}
+            label={fieldDef.label}
+            data-1p-ignore
+            disabled={disabled}
+            defaultValue={values?.[fieldName] as string | undefined}
+            placeholder={fieldDef.placeholder || ""}
+            autoFocus={isFirstTextInput}
+          />
         );
       })}
     </>
