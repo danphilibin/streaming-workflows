@@ -43,3 +43,15 @@ Reorganized file structure. Separated client code from worker code for cleaner i
 ## Confirm Method (0a8c413)
 
 Added `relay.confirm()` convenience method for yes/no prompts.
+
+## Refund Example (fccb031)
+
+Added refund workflow demonstrating complex branching logic with multiple decision paths.
+
+## Workflow Completion (54add9b)
+
+Added completion message when workflows finish, giving users clear feedback that execution is done.
+
+## Kumo Component Library (e9ab255 - fec7819)
+
+Integrated Kumo component library for UI elements. Added suppressAutoFocus option for better input control.
