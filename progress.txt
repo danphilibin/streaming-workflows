@@ -1,0 +1,45 @@
+# Progress Log
+
+Append-only log tracking high-level development milestones.
+
+---
+
+## Foundation (645f6f8 - dfabd6d)
+
+Built initial prototype connecting Cloudflare Durable Objects with Cloudflare Workflows. Established a persistent readable stream per workflow run that can be connected to and streamed to from the client. Added HTML prototype UI and made it deployable.
+
+## Multi-workflow Support (aec808b)
+
+Extended architecture to support multiple workflows in a single worker. Each workflow gets registered and can be triggered independently.
+
+## User Input (1c89bb9 - d309734)
+
+Added `relay.input()` to pause workflow execution and wait for user input. Made workflows resumable so they can be interrupted and continued after receiving input.
+
+## React Frontend (1f5d9d5 - 3c0af9b)
+
+Replaced HTML prototype with React app using Vite. Built message-based UI that renders workflow output and input prompts. Made relay calls replay-safe using `step.do` for idempotency. Fixed duplicate message handling in frontend stream.
+
+## Structured Input Schemas (67af00e - fad2db5)
+
+Added Zod for schema validation. Input prompts now support structured schemas that generate forms in the UI. Moved input/output to root relay object.
+
+## createWorkflow Helper (86fd52d - f80d002)
+
+Added `createWorkflow()` function for more idiomatic workflow registration. Updated all example workflows to use the new pattern.
+
+## UX Polish (8f566e4 - f5c094a)
+
+Fixed request/response value pairing. Added 404 fallback, nicer loading states, "waiting" indicator for slow responses. Fixed layout shift and input value restoration.
+
+## Button Support (338797b - 8485783)
+
+Added button types to input prompts with primary/secondary/danger intents. Buttons return a `$choice` value indicating which was clicked. Improved type inference so button labels are typed as literals. Smart Enter key handling for single vs multiple buttons.
+
+## SDK Cleanup (45214e4 - e451c7c)
+
+Reorganized file structure. Separated client code from worker code for cleaner imports.
+
+## Confirm Method (0a8c413)
+
+Added `relay.confirm()` convenience method for yes/no prompts.
