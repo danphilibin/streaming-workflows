@@ -52,11 +52,11 @@ export function getWorkflowList(): {
   input?: InputSchema;
 }[] {
   return Array.from(workflows.values())
-    .map(({ slug, title, description }) => ({
+    .map(({ slug, title, description, input }) => ({
       slug,
       title,
       description,
+      input,
     }))
     .sort((a, b) => a.title.localeCompare(b.title));
 }
-
