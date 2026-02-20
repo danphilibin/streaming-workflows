@@ -73,8 +73,12 @@ export type InputRequestMessage = z.infer<typeof InputRequestMessageSchema>;
 export type InputReceivedMessage = z.infer<typeof InputReceivedMessageSchema>;
 export type LoadingMessage = z.infer<typeof LoadingMessageSchema>;
 export type ConfirmRequestMessage = z.infer<typeof ConfirmRequestMessageSchema>;
-export type ConfirmReceivedMessage = z.infer<typeof ConfirmReceivedMessageSchema>;
-export type WorkflowCompleteMessage = z.infer<typeof WorkflowCompleteMessageSchema>;
+export type ConfirmReceivedMessage = z.infer<
+  typeof ConfirmReceivedMessageSchema
+>;
+export type WorkflowCompleteMessage = z.infer<
+  typeof WorkflowCompleteMessageSchema
+>;
 export type StreamMessage = z.infer<typeof StreamMessageSchema>;
 
 /**

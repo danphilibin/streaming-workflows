@@ -75,7 +75,12 @@ export function createWorkflow(config: {
   input?: InputSchema;
   handler: (...args: any[]) => Promise<void>;
 }): void {
-  registerWorkflow(config.name, config.handler as RelayHandler, config.input, config.description);
+  registerWorkflow(
+    config.name,
+    config.handler as RelayHandler,
+    config.input,
+    config.description,
+  );
 }
 
 /**

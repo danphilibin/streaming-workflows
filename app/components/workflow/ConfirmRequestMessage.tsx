@@ -74,7 +74,9 @@ export function ConfirmRequestMessage({
           <div className="shrink-0 w-6 h-6 rounded-full bg-amber-600 flex items-center justify-center">
             <Warning size={16} weight="bold" className="text-white" />
           </div>
-          <span className="text-base font-medium text-[#fafafa]">{message}</span>
+          <span className="text-base font-medium text-[#fafafa]">
+            {message}
+          </span>
         </div>
 
         <div className="flex gap-2 ml-9">

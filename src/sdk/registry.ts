@@ -45,7 +45,12 @@ export function getWorkflow(slug: string): WorkflowDefinition | undefined {
   return workflows.get(slug);
 }
 
-export function getWorkflowList(): { slug: string; title: string; description?: string }[] {
+export function getWorkflowList(): {
+  slug: string;
+  title: string;
+  description?: string;
+  input?: InputSchema;
+}[] {
   return Array.from(workflows.values())
     .map(({ slug, title, description }) => ({
       slug,
