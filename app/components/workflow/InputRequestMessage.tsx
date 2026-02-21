@@ -1,9 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { type InputSchema, type NormalizedButton } from "@/isomorphic";
 import { Button } from "@cloudflare/kumo/components/button";
-import { Input } from "@cloudflare/kumo/components/input";
-import { Checkbox } from "@cloudflare/kumo/components/checkbox";
-import { Select } from "@cloudflare/kumo/components/select";
+import { FIELD_REGISTRY } from "./SchemaFieldComponents";
 
 interface InputRequestMessageProps {
   eventName: string;
@@ -26,6 +24,27 @@ const intentToVariant: Record<string, "primary" | "secondary" | "destructive"> =
     danger: "destructive",
   };
 
+function initFieldValues(
+  schema: InputSchema,
+  submittedValue?: Record<string, unknown>,
+): Record<string, unknown> {
+  const values: Record<string, unknown> = {};
+  for (const [fieldName, fieldDef] of Object.entries(schema)) {
+    if (submittedValue && fieldName in submittedValue) {
+      values[fieldName] = submittedValue[fieldName];
+    } else if (fieldDef.type === "checkbox") {
+      values[fieldName] = false;
+    } else if (fieldDef.type === "select") {
+      values[fieldName] = fieldDef.options?.[0]?.value ?? "";
+    } else if (fieldDef.type === "number") {
+      values[fieldName] = 0;
+    } else {
+      values[fieldName] = "";
+    }
+  }
+  return values;
+}
+
 export function InputRequestMessage({
   eventName,
   prompt,
@@ -37,37 +56,22 @@ export function InputRequestMessage({
 }: InputRequestMessageProps) {
   const [isSubmitted, setIsSubmitted] = useState(!!submittedValue);
   const choiceRef = useRef<string | null>(null);
-  // Track select/checkbox values for form submission (Kumo uses Base UI which
-  // may not render native form elements for FormData collection)
-  const controlledValues = useRef<Record<string, unknown>>({});
+  const [fieldValues, setFieldValues] = useState<Record<string, unknown>>(() =>
+    initFieldValues(schema, submittedValue),
+  );
 
-  const collectFormValues = (
-    form: HTMLFormElement,
-  ): Record<string, unknown> => {
-    const formData = new FormData(form);
-    const value: Record<string, unknown> = {};
-
-    for (const [fieldName, fieldDef] of Object.entries(schema)) {
-      if (fieldDef.type === "checkbox") {
-        value[fieldName] = controlledValues.current[fieldName] ?? false;
-      } else if (fieldDef.type === "select") {
-        value[fieldName] = controlledValues.current[fieldName] ?? "";
-      } else if (fieldDef.type === "number") {
-        const raw = formData.get(fieldName);
-        value[fieldName] = raw ? Number(raw) : 0;
-      } else {
-        value[fieldName] = formData.get(fieldName) ?? "";
-      }
-    }
-
-    return value;
-  };
+  const handleFieldChange = useCallback(
+    (fieldName: string, value: unknown) => {
+      setFieldValues((prev) => ({ ...prev, [fieldName]: value }));
+    },
+    [],
+  );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (isSubmitted) return;
 
-    const value = collectFormValues(e.currentTarget);
+    const value = { ...fieldValues };
 
     if (choiceRef.current) {
       value.$choice = choiceRef.current;
@@ -88,6 +92,18 @@ export function InputRequestMessage({
     }
   };
 
+  // Find first auto-focusable field
+  let autoFocusFieldName: string | undefined;
+  if (!suppressAutoFocus) {
+    for (const [fieldName, fieldDef] of Object.entries(schema)) {
+      const entry = FIELD_REGISTRY[fieldDef.type];
+      if (entry?.autoFocusable) {
+        autoFocusFieldName = fieldName;
+        break;
+      }
+    }
+  }
+
   return (
     <form
       className="my-4 p-5 rounded-xl border bg-[#111] border-[#222]"
@@ -96,13 +112,22 @@ export function InputRequestMessage({
       <div className="flex flex-col gap-4">
         <span className="text-base font-medium text-[#fafafa]">{prompt}</span>
 
-        <SchemaFields
-          schema={schema}
-          disabled={isSubmitted}
-          values={submittedValue}
-          controlledValues={controlledValues}
-          suppressAutoFocus={suppressAutoFocus}
-        />
+        {Object.entries(schema).map(([fieldName, fieldDef]) => {
+          const entry = FIELD_REGISTRY[fieldDef.type];
+          if (!entry) return null;
+          const Component = entry.component;
+          return (
+            <Component
+              key={fieldName}
+              fieldName={fieldName}
+              fieldDef={fieldDef}
+              disabled={isSubmitted}
+              defaultValue={submittedValue?.[fieldName]}
+              autoFocus={fieldName === autoFocusFieldName}
+              onChange={handleFieldChange}
+            />
+          );
+        })}
 
         <div className="flex gap-2">
           {buttons.map((btn) => (
@@ -119,134 +144,5 @@ export function InputRequestMessage({
         </div>
       </div>
     </form>
-  );
-}
-
-interface SchemaFieldsProps {
-  schema: InputSchema;
-  disabled: boolean;
-  values?: Record<string, unknown>;
-  controlledValues: React.RefObject<Record<string, unknown>>;
-  suppressAutoFocus?: boolean;
-}
-
-function SchemaFields({
-  schema,
-  disabled,
-  values,
-  controlledValues,
-  suppressAutoFocus,
-}: SchemaFieldsProps) {
-  // Find the first text input field name for autofocus
-  const firstTextFieldName = Object.entries(schema).find(
-    ([, fieldDef]) =>
-      !fieldDef.type ||
-      fieldDef.type === "text" ||
-      (fieldDef.type !== "checkbox" &&
-        fieldDef.type !== "number" &&
-        fieldDef.type !== "select"),
-  )?.[0];
-
-  return (
-    <>
-      {Object.entries(schema).map(([fieldName, fieldDef]) => {
-        const isFirstTextInput =
-          fieldName === firstTextFieldName &&
-          (!fieldDef.type ||
-            fieldDef.type === "text" ||
-            (fieldDef.type !== "checkbox" &&
-              fieldDef.type !== "number" &&
-              fieldDef.type !== "select"));
-
-        if (fieldDef.type === "checkbox") {
-          // Initialize controlled value from submitted data
-          if (!(fieldName in controlledValues.current)) {
-            controlledValues.current[fieldName] = values?.[fieldName] === true;
-          }
-
-          return (
-            <Checkbox
-              key={fieldName}
-              label={fieldDef.label}
-              name={fieldName}
-              disabled={disabled}
-              checked={values?.[fieldName] === true ? true : undefined}
-              onCheckedChange={(checked) => {
-                controlledValues.current[fieldName] = checked;
-              }}
-            />
-          );
-        }
-
-        if (fieldDef.type === "number") {
-          return (
-            <Input
-              key={fieldName}
-              type="number"
-              name={fieldName}
-              label={fieldDef.label}
-              data-1p-ignore
-              disabled={disabled}
-              defaultValue={values?.[fieldName] as number | undefined}
-              placeholder={fieldDef.placeholder || ""}
-            />
-          );
-        }
-
-        if (fieldDef.type === "select") {
-          const defaultVal = values?.[fieldName] as string | undefined;
-          // Initialize controlled value from submitted/default data
-          if (
-            defaultVal !== undefined &&
-            !(fieldName in controlledValues.current)
-          ) {
-            controlledValues.current[fieldName] = defaultVal;
-          } else if (
-            !(fieldName in controlledValues.current) &&
-            fieldDef.options?.length
-          ) {
-            controlledValues.current[fieldName] = fieldDef.options[0].value;
-          }
-
-          return (
-            <Select
-              key={fieldName}
-              label={fieldDef.label}
-              hideLabel={false}
-              disabled={disabled}
-              defaultValue={defaultVal ?? fieldDef.options?.[0]?.value}
-              renderValue={(value: unknown) => {
-                const opt = fieldDef.options?.find((o) => o.value === value);
-                return opt?.label ?? String(value ?? "");
-              }}
-              onValueChange={(v) => {
-                controlledValues.current[fieldName] = v;
-              }}
-            >
-              {fieldDef.options?.map((opt) => (
-                <Select.Option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </Select.Option>
-              ))}
-            </Select>
-          );
-        }
-
-        // Default: text input
-        return (
-          <Input
-            key={fieldName}
-            type="text"
-            name={fieldName}
-            label={fieldDef.label}
-            data-1p-ignore
-            disabled={disabled}
-            defaultValue={values?.[fieldName] as string | undefined}
-            placeholder={fieldDef.placeholder || ""}
-            autoFocus={isFirstTextInput && !suppressAutoFocus}
-          />
-        );
-      })}
-    </>
   );
 }
