@@ -9,5 +9,6 @@ pnpm i
 pnpm cf-typegen
 
 npm install -g agent-browser
+agent-browser install
 
 exit 0
