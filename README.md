@@ -1,6 +1,8 @@
 # Relay
 
-A prototype app that pairs [Cloudflare Workflows](https://developers.cloudflare.com/workflows/) with [Durable Objects](https://developers.cloudflare.com/durable-objects/) to enable interactive backend functions that pause for user input, show progress, and stream UI instructions to the browser.
+Prototype. Pairs [Cloudflare Workflows](https://developers.cloudflare.com/workflows/) with [Durable Objects](https://developers.cloudflare.com/durable-objects/) to enable interactive backend functions that pause for user input, show progress, and stream UI instructions to the browser.
+
+_A spiritual successor to [Interval](https://docs.intervalkit.com/)_
 
 ## How to run
 
