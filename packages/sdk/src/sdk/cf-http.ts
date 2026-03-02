@@ -8,6 +8,8 @@ import {
   respondToWorkflowRun,
   WorkflowNotFoundError,
 } from "./workflow-api";
+import { formatCallResponseForMcp } from "../isomorphic/mcp-translation";
+import { logMcpToolResult } from "./mcp-logger";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,6 +65,7 @@ async function handleRequest(req: Request, env: Env): Promise<Response> {
 
     try {
       const result = await startWorkflowRun(env, body.workflow, body.data);
+      logMcpToolResult(result, formatCallResponseForMcp(result), "start");
       return Response.json(result);
     } catch (e) {
       if (e instanceof WorkflowNotFoundError) {
@@ -87,6 +90,7 @@ async function handleRequest(req: Request, env: Env): Promise<Response> {
       body.event,
       body.data,
     );
+    logMcpToolResult(result, formatCallResponseForMcp(result), "respond");
     return Response.json(result);
   }
 
