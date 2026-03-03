@@ -1,5 +1,7 @@
 {
   "run_id": "run-complete-1",
+  "workflow_slug": "test-workflow",
+  "run_url": null,
   "status": "complete",
   "messages": [
     {
