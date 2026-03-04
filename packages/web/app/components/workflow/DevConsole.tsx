@@ -38,12 +38,12 @@ export function DevConsole({ status, runId, messages }: DevConsoleProps) {
     }
   }, [runId]);
 
-  // Fetch MCP log when switching to MCP mode or when status changes
+  // Fetch MCP log when switching to MCP mode, or when new messages arrive
   useEffect(() => {
     if (isVisible && mode === "mcp" && runId) {
       fetchMcpLog();
     }
-  }, [isVisible, mode, runId, status, fetchMcpLog]);
+  }, [isVisible, mode, runId, status, messages.length, fetchMcpLog]);
 
   const toggleMessage = (index: number) => {
     setExpandedMessages((prev) => {

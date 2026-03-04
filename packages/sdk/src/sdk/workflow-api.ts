@@ -116,9 +116,9 @@ export async function startWorkflowRun(
     interaction,
   };
 
-  // Log MCP call (fire-and-forget)
+  // Log MCP call
   const text = formatCallResponseForMcp(result);
-  stub.fetch("http://internal/mcp-log", {
+  await stub.fetch("http://internal/mcp-log", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -187,9 +187,9 @@ export async function respondToWorkflowRun(
     interaction,
   };
 
-  // Log MCP call (fire-and-forget)
+  // Log MCP call
   const text = formatCallResponseForMcp(result);
-  stub.fetch("http://internal/mcp-log", {
+  await stub.fetch("http://internal/mcp-log", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
