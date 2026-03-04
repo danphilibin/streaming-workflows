@@ -79,6 +79,8 @@ function formatStreamMessage(
         : "[Confirmation received] rejected";
     case "workflow_complete":
       return "[Workflow complete]";
+    case "debug":
+      return null;
     default:
       return assertNever(message);
   }

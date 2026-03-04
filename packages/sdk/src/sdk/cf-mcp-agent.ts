@@ -41,7 +41,10 @@ export class RelayMcpAgent extends McpAgent<Env> {
           data,
         );
         const text = formatCallResponseForMcp(result);
-        logMcpToolResult(result, text, "respond");
+        logMcpToolResult(result, text, "respond", {
+          env: this.env,
+          runId: run_id,
+        });
         return {
           content: [{ type: "text", text }],
         };
@@ -63,7 +66,10 @@ export class RelayMcpAgent extends McpAgent<Env> {
           const data = Object.keys(zodSchema).length > 0 ? params : undefined;
           const result = await startWorkflowRun(this.env, workflow.slug, data);
           const text = formatCallResponseForMcp(result);
-          logMcpToolResult(result, text, "start");
+          logMcpToolResult(result, text, "start", {
+            env: this.env,
+            runId: result.run_id,
+          });
           return {
             content: [{ type: "text", text }],
           };

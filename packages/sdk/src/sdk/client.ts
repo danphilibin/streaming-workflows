@@ -12,6 +12,7 @@ export {
   type ConfirmRequestMessage,
   type ConfirmReceivedMessage,
   type WorkflowCompleteMessage,
+  type DebugMessage,
   type CallResponseResult,
   type CallResponseStatus,
   type InteractionPoint,

@@ -59,6 +59,13 @@ export const WorkflowCompleteMessageSchema = z.object({
   type: z.literal("workflow_complete"),
 });
 
+export const DebugMessageSchema = z.object({
+  id: z.string(),
+  type: z.literal("debug"),
+  label: z.string(),
+  data: z.record(z.string(), z.unknown()),
+});
+
 export const StreamMessageSchema = z.discriminatedUnion("type", [
   OutputMessageSchema,
   InputRequestMessageSchema,
@@ -67,6 +74,7 @@ export const StreamMessageSchema = z.discriminatedUnion("type", [
   ConfirmRequestMessageSchema,
   ConfirmReceivedMessageSchema,
   WorkflowCompleteMessageSchema,
+  DebugMessageSchema,
 ]);
 
 export type OutputMessage = z.infer<typeof OutputMessageSchema>;
@@ -80,6 +88,7 @@ export type ConfirmReceivedMessage = z.infer<
 export type WorkflowCompleteMessage = z.infer<
   typeof WorkflowCompleteMessageSchema
 >;
+export type DebugMessage = z.infer<typeof DebugMessageSchema>;
 export type StreamMessage = z.infer<typeof StreamMessageSchema>;
 
 /**
@@ -142,6 +151,14 @@ export function createConfirmReceived(
 
 export function createWorkflowComplete(id: string): WorkflowCompleteMessage {
   return { id, type: "workflow_complete" };
+}
+
+export function createDebugMessage(
+  id: string,
+  label: string,
+  data: Record<string, unknown>,
+): DebugMessage {
+  return { id, type: "debug", label, data };
 }
 
 /**

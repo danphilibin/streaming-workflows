@@ -158,6 +158,7 @@ function MessageRow({
     confirm_received: "text-orange-300",
     loading: "text-gray-400",
     workflow_complete: "text-green-400",
+    debug: "text-cyan-400",
   };
 
   return (
