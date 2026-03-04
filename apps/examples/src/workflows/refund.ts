@@ -75,11 +75,16 @@ export const refund = createWorkflow({
       },
     });
 
+    await output.table({
+      title: "Refund Summary",
+      data: selectedItems.map((i) => ({
+        Item: i.name,
+        Price: `$${i.price.toFixed(2)}`,
+      })),
+    });
+
     await output.markdown(
-      `## Refund Summary\n\n` +
-        `**Items:**\n` +
-        selectedItems.map((i) => `- ${i.name}`).join("\n") +
-        `\n\n**Total:** $${refundTotal.toFixed(2)}  \n` +
+      `**Total:** $${refundTotal.toFixed(2)}  \n` +
         `**Reason:** ${reason}${reasonDetail ? ` — ${reasonDetail}` : ""}`,
     );
 

@@ -14,7 +14,5 @@ export default { fetch: httpHandler };
 import "./workflows/fetch-hacker-news";
 import "./workflows/ask-name";
 import "./workflows/newsletter-signup";
-import "./workflows/survey";
-import "./workflows/approval-test";
 import "./workflows/refund";
-import "./workflows/rich-output-demo";
+import "./workflows/create-webhook";
