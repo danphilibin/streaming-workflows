@@ -3,9 +3,11 @@ pre-commit:
   jobs:
     - name: format
       glob: "*.{js,jsx,ts,tsx,mjs,cjs,json,css,md}"
-      run: npx oxfmt {staged_files}
+      run: npx oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true
+      skip_empty: true
 
     - name: lint
       glob: "*.{js,jsx,ts,tsx,mjs,cjs}"
       run: npx oxlint {staged_files}
+      skip_empty: true

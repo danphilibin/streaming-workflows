@@ -12,7 +12,8 @@
       "Bash(pnpm format:*)",
       "Bash(pnpm typecheck:*)",
       "Bash(npx tsc:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(agent-browser:*)"
     ]
   },
   "hooks": {
