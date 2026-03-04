@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { type StreamMessage } from "../isomorphic/messages";
+import { type McpCallLogEntry } from "../isomorphic/mcp-translation";
 
 /**
  * Durable Object that stores and streams messages for a workflow run.
@@ -88,6 +89,23 @@ export class RelayDurableObject extends DurableObject {
     if (request.method === "GET" && url.pathname === "/metadata") {
       const slug = await this.ctx.storage.get<string>("slug");
       return Response.json({ slug: slug ?? null });
+    }
+
+    // POST /mcp-log - append an MCP call log entry
+    if (request.method === "POST" && url.pathname === "/mcp-log") {
+      const { entry } = await request.json<{ entry: McpCallLogEntry }>();
+      const entries =
+        (await this.ctx.storage.get<McpCallLogEntry[]>("mcp_calls")) || [];
+      entries.push(entry);
+      await this.ctx.storage.put("mcp_calls", entries);
+      return new Response("OK");
+    }
+
+    // GET /mcp-log - retrieve all MCP call log entries
+    if (request.method === "GET" && url.pathname === "/mcp-log") {
+      const entries =
+        (await this.ctx.storage.get<McpCallLogEntry[]>("mcp_calls")) || [];
+      return Response.json({ entries });
     }
 
     return new Response("Not found", { status: 404 });

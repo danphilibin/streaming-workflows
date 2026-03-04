@@ -115,6 +115,14 @@ async function handleRequest(req: Request, env: Env): Promise<Response> {
     return stub.fetch("http://internal/stream");
   }
 
+  // GET /workflows/:id/mcp-log - retrieves MCP call log entries
+  const mcpLogMatch = url.pathname.match(/^\/workflows\/([^/]+)\/mcp-log$/);
+  if (req.method === "GET" && mcpLogMatch) {
+    const [, workflowId] = mcpLogMatch;
+    const stub = env.RELAY_DURABLE_OBJECT.getByName(workflowId);
+    return stub.fetch("http://internal/mcp-log");
+  }
+
   // POST /workflows/:id/event/:name - submits an event to a workflow
   const eventMatch = url.pathname.match(
     /^\/workflows\/([^/]+)\/event\/([^/]+)$/,

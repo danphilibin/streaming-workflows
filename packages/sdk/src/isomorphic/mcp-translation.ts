@@ -6,6 +6,17 @@ import type {
 } from "./messages";
 import type { OutputBlock } from "./output";
 
+/**
+ * A single MCP call log entry — captures the actual formatted text
+ * returned to an MCP agent for a tool call.
+ */
+export type McpCallLogEntry = {
+  action: "start" | "respond";
+  text: string;
+  charCount: number;
+  timestamp: string;
+};
+
 function assertNever(value: never): never {
   throw new Error(`Unhandled message type: ${JSON.stringify(value)}`);
 }

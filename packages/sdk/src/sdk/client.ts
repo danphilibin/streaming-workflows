@@ -19,7 +19,10 @@ export {
   parseStreamMessage,
 } from "../isomorphic/messages";
 
-export { formatCallResponseForMcp } from "../isomorphic/mcp-translation";
+export {
+  formatCallResponseForMcp,
+  type McpCallLogEntry,
+} from "../isomorphic/mcp-translation";
 
 export {
   type WorkflowParams,
