@@ -84,7 +84,7 @@ Code shared between server and client — no `cloudflare:workers` imports. Conta
 - **`input.ts`** — `InputSchema` field types + type inference utilities
 - **`output.ts`** — `OutputBlock` types (markdown, table, code, image, link, buttons)
 - **`registry-types.ts`** — Workflow registry types safe for client import
-- **`mcp-translation.ts`** — Formats `CallResponseResult` as human-readable text for MCP agents
+- **`mcp-translation.ts`** — Formats `CallResponseResult` as human-readable text for MCP agents + `McpCallLogEntry` type
 
 #### `src/sdk/`
 
@@ -228,6 +228,7 @@ Type inference: text → string, number → number, checkbox → boolean, select
 | `GET`  | `/workflows`                 | Returns workflow metadata list from registry            |
 | `POST` | `/workflows`                 | Creates a new workflow instance, returns `{ id, name }` |
 | `GET`  | `/workflows/:id/stream`      | Proxies to the DO's NDJSON stream                       |
+| `GET`  | `/workflows/:id/mcp-log`     | Returns MCP call log entries for a run                  |
 | `POST` | `/workflows/:id/event/:name` | Submits user response (input value or confirm decision) |
 
 #### Call-response API (agents)

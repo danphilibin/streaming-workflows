@@ -5,6 +5,10 @@ import {
   type InteractionPoint,
   interactionStatus,
 } from "../isomorphic/messages";
+import {
+  formatCallResponseForMcp,
+  type McpCallLogEntry,
+} from "../isomorphic/mcp-translation";
 
 /**
  * Consume an NDJSON stream from the DO, collecting messages until we hit
@@ -103,7 +107,7 @@ export async function startWorkflowRun(
   const { messages, interaction } =
     await consumeUntilInteraction(streamResponse);
 
-  return {
+  const result: CallResponseResult = {
     run_id: instance.id,
     workflow_slug: slug,
     run_url: buildRunUrl(env.RELAY_APP_URL, slug, instance.id),
@@ -111,6 +115,23 @@ export async function startWorkflowRun(
     messages,
     interaction,
   };
+
+  // Log MCP call
+  const text = formatCallResponseForMcp(result);
+  await stub.fetch("http://internal/mcp-log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      entry: {
+        action: "start",
+        text,
+        charCount: text.length,
+        timestamp: new Date().toISOString(),
+      } satisfies McpCallLogEntry,
+    }),
+  });
+
+  return result;
 }
 
 /**
@@ -157,7 +178,7 @@ export async function respondToWorkflowRun(
     event,
   );
 
-  return {
+  const result: CallResponseResult = {
     run_id: runId,
     workflow_slug: slug ?? "",
     run_url: slug ? buildRunUrl(env.RELAY_APP_URL, slug, runId) : null,
@@ -165,6 +186,23 @@ export async function respondToWorkflowRun(
     messages,
     interaction,
   };
+
+  // Log MCP call
+  const text = formatCallResponseForMcp(result);
+  await stub.fetch("http://internal/mcp-log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      entry: {
+        action: "respond",
+        text,
+        charCount: text.length,
+        timestamp: new Date().toISOString(),
+      } satisfies McpCallLogEntry,
+    }),
+  });
+
+  return result;
 }
 
 export class WorkflowNotFoundError extends Error {
