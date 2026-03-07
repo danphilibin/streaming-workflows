@@ -28,7 +28,7 @@ import {
   type StreamMessage,
 } from "../isomorphic/messages";
 import type { OutputBlock, OutputButtonDef } from "../isomorphic/output";
-import { getWorkflow, registerWorkflow } from "./registry";
+import { getWorkflow, registerPresenter, registerWorkflow } from "./registry";
 import type { WorkflowParams } from "../isomorphic/registry-types";
 import {
   type LoaderDef,
@@ -366,11 +366,16 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
     },
     table: async (opts: any) => {
       if (isLoaderTable(opts)) {
-        const { source, title, pageSize, columns } = opts;
+        const { source, title, pageSize, presenter } = opts;
+        const columns = presenter?.columns ?? opts.columns;
         const stepId = this.stepName("output");
 
-        // Store renderCell functions in the registry for the HTTP endpoint
-        if (columns) {
+        if (presenter) {
+          registerPresenter(presenter);
+        }
+
+        // Legacy path: store inline renderCell functions in the workflow registry.
+        if (columns && !presenter) {
           const definition = getWorkflow(this.workflowSlug);
           if (definition) {
             const renderFns = (columns as any[]).map((col: any) => {
@@ -391,6 +396,7 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
           loader: {
             name: source.name,
             workflow: this.workflowSlug,
+            presenter: presenter?.name,
             pageSize,
             params: source.params,
             columns: serializeColumns(columns),
