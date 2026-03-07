@@ -69,11 +69,7 @@ export const OutputTableLoaderBlockSchema = z.object({
   title: z.string().optional(),
   loader: z.object({
     path: z.string(),
-    name: z.string(),
-    workflow: z.string(),
-    presenter: z.string().optional(),
     pageSize: z.number().optional(),
-    params: z.record(z.string(), z.unknown()),
     columns: z.array(SerializedColumnDefSchema).optional(),
   }),
 });

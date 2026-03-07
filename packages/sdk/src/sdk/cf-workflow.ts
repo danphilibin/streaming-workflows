@@ -423,11 +423,7 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
               presenterName: presenter?.name,
               params: source.params,
             }),
-            name: source.name,
-            workflow: this.workflowSlug,
-            presenter: presenter?.name,
             pageSize,
-            params: source.params,
             columns: serializeColumns(columns),
           },
         };
