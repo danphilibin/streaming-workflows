@@ -71,6 +71,43 @@ Once you've deployed each app at least once and configured `packages/web/.env`, 
 pnpm build && pnpm deploy:all
 ```
 
+## MCP
+
+Every workflow you define with `createWorkflow()` is automatically exposed as an [MCP](https://modelcontextprotocol.io/) tool. Agents can start workflows, respond to input requests, and receive structured output — all through the MCP protocol.
+
+Relay supports two MCP transports:
+
+- **Remote (Streamable HTTP)** — served at the `/mcp` endpoint of your deployed worker (e.g. `https://relay-tools.your-subdomain.workers.dev/mcp`)
+- **Local (stdio)** — a lightweight Node.js process that proxies tool calls to the Relay API
+
+### Connecting from Claude Desktop / Claude Web
+
+Add your deployed worker's MCP endpoint as a remote MCP server:
+
+```
+https://relay-tools.your-subdomain.workers.dev/mcp
+```
+
+In Claude Web or Claude Desktop, go to Settings → MCP Servers → Add → enter the URL above.
+
+### Connecting from Claude Code
+
+```bash
+claude mcp add relay-tools https://relay-tools.your-subdomain.workers.dev/mcp
+```
+
+For local development, use the stdio transport instead:
+
+```bash
+claude mcp add relay-tools -- npx tsx mcp/server.ts
+```
+
+This starts a local MCP server that connects to `http://localhost:8787` by default. To point it at a deployed worker, set the `RELAY_WORKER_URL` environment variable:
+
+```bash
+claude mcp add relay-tools -e RELAY_WORKER_URL=https://relay-tools.your-subdomain.workers.dev -- npx tsx mcp/server.ts
+```
+
 ## How it works
 
 Workflows are defined with `createWorkflow()`. The handler receives a context with `input()`, `output()`, `loading()`, and `confirm()` helpers:
