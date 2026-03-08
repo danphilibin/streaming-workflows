@@ -154,6 +154,9 @@ function buildLoaderRefs(
 ): Record<string, LoaderRef | ((params: any) => LoaderRef)> {
   if (!loaderDefs) return {};
 
+  // Handlers get serializable loader handles rather than direct loader
+  // callbacks. That keeps the workflow body ergonomic while deferring the
+  // actual fetch to the HTTP layer later on.
   const refs: Record<string, LoaderRef | ((params: any) => LoaderRef)> = {};
 
   for (const [name, def] of Object.entries(loaderDefs)) {
@@ -273,9 +276,9 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
     return `relay-${prefix}-${this.counter++}`;
   }
 
-  // Build an opaque fetch target for loader-backed tables. This keeps transport
-  // details like step scoping, bound params, and presenter selection on the
-  // server side so the browser only has to append paging/search inputs.
+  // Build the fetch path for a loader-backed table. We assemble it on the
+  // server so the browser does not need to know about step IDs, bound params,
+  // or which presenter should run for the returned rows.
   private buildLoaderPath(opts: {
     workflow: string;
     name: string;
@@ -389,10 +392,14 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
     table: async (opts: any) => {
       if (isLoaderTable(opts)) {
         const { source, title, pageSize, presenter } = opts;
+        // Presenters own the display shape when provided; otherwise we fall back
+        // to any inline columns passed directly to output.table().
         const columns = presenter?.columns ?? opts.columns;
         const stepId = this.stepName("output");
 
         if (presenter) {
+          // Named presenters are reusable across tables, so we register them by
+          // name and let the HTTP layer look them up later during page fetches.
           registerPresenter(presenter);
         }
 
@@ -416,6 +423,9 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
           type: "output.table_loader" as const,
           title,
           loader: {
+            // The client treats this as a ready-to-use fetch path. It already
+            // includes the extra server-side details needed to fetch the same
+            // loader data again for later pages/searches.
             path: this.buildLoaderPath({
               workflow: this.workflowSlug,
               name: source.name,
