@@ -1,6 +1,6 @@
 import type { RelayHandler } from "./cf-workflow";
 import type { InputSchema } from "../isomorphic/input";
-import type { LoaderDef, PresenterDef } from "./loader";
+import type { LoaderDef, TableRendererDef } from "./loader";
 
 export type WorkflowDefinition = {
   slug: string;
@@ -18,9 +18,10 @@ export type WorkflowDefinition = {
 };
 
 const workflows: Map<string, WorkflowDefinition> = new Map();
-// Process-local presenter registry. A named presenter keeps its callbacks on the
-// server while loader responses only stream serialized column metadata to the UI.
-const presenters: Map<string, PresenterDef<any>> = new Map();
+// Process-local table renderer registry. A named table renderer keeps its
+// callbacks on the server while loader responses only stream serialized column
+// metadata to the UI.
+const tableRenderers: Map<string, TableRendererDef<any>> = new Map();
 
 /**
  * Converts a title to a URL-friendly slug
@@ -60,12 +61,16 @@ export function getWorkflow(slug: string): WorkflowDefinition | undefined {
   return workflows.get(slug);
 }
 
-export function registerPresenter(presenter: PresenterDef<any>): void {
-  presenters.set(presenter.name, presenter);
+export function registerTableRenderer(
+  tableRenderer: TableRendererDef<any>,
+): void {
+  tableRenderers.set(tableRenderer.name, tableRenderer);
 }
 
-export function getPresenter(name: string): PresenterDef<any> | undefined {
-  return presenters.get(name);
+export function getTableRenderer(
+  name: string,
+): TableRendererDef<any> | undefined {
+  return tableRenderers.get(name);
 }
 
 export function getWorkflowList(): {

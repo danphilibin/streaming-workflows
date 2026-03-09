@@ -1,7 +1,7 @@
-import { createWorkflow, loader, presenter } from "relay-sdk";
+import { createWorkflow, loader, tableRenderer } from "relay-sdk";
 import { db, type User, DEPARTMENTS } from "../lib/mock-db";
 
-const userPresenter = presenter<User>("user-table", {
+const userTableRenderer = tableRenderer<User>("user-table", {
   columns: [
     { label: "ID", accessorKey: "id" },
     {
@@ -33,7 +33,7 @@ export const browseUsers = createWorkflow({
     // await output.table({
     //   title: "All Users",
     //   source: loaders.users,
-    //   presenter: userPresenter,
+    //   tableRenderer: userTableRenderer,
     //   pageSize: 10,
     // });
 
@@ -57,7 +57,7 @@ export const browseUsers = createWorkflow({
           : loaders.deptUsers({ department }),
       pageSize: 5,
       // columns: ["name", "email", "department", "role"],
-      presenter: userPresenter,
+      tableRenderer: userTableRenderer,
     });
   },
 });
