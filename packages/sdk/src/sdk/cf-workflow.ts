@@ -28,11 +28,7 @@ import {
   type StreamMessage,
 } from "../isomorphic/messages";
 import type { OutputBlock, OutputButtonDef } from "../isomorphic/output";
-import {
-  getWorkflow,
-  registerTableRenderer,
-  registerWorkflow,
-} from "./registry";
+import { getWorkflow, registerWorkflow } from "./registry";
 import type { WorkflowParams } from "../isomorphic/registry-types";
 import {
   type LoaderDef,
@@ -400,12 +396,6 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
         // to any inline columns passed directly to output.table().
         const columns = tableRenderer?.columns ?? opts.columns;
         const stepId = this.stepName("output");
-
-        if (tableRenderer) {
-          // Named table renderers are reusable across tables, so we register them by
-          // name and let the HTTP layer look them up later during page fetches.
-          registerTableRenderer(tableRenderer);
-        }
 
         const block: OutputBlock = {
           type: "output.table_loader" as const,
