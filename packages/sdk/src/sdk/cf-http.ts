@@ -1,4 +1,4 @@
-import { getPresenter, getWorkflow, getWorkflowList } from "./registry";
+import { getTableRenderer, getWorkflow, getWorkflowList } from "./registry";
 import {
   WorkflowParamsSchema,
   type StartWorkflowParams,
@@ -194,7 +194,8 @@ async function handleRequest(req: Request, env: Env): Promise<Response> {
     // These query params are added by buildLoaderPath(). The browser does not
     // need to know what they mean; it just uses the path the SDK gave it.
     const stepId = url.searchParams.get("stepId") ?? undefined;
-    const presenterName = url.searchParams.get("presenter") ?? undefined;
+    const tableRendererName =
+      url.searchParams.get("tableRenderer") ?? undefined;
 
     // Parse custom params from the descriptor
     const customParams: Record<string, unknown> = {};
@@ -218,15 +219,15 @@ async function handleRequest(req: Request, env: Env): Promise<Response> {
       env,
     );
 
-    // Named presenters are globally reusable and don't depend on per-run state.
-    if (presenterName) {
-      const tablePresenter = getPresenter(presenterName);
-      if (tablePresenter && result.data.length > 0) {
+    // Named table renderers are globally reusable and don't depend on per-run state.
+    if (tableRendererName) {
+      const renderer = getTableRenderer(tableRendererName);
+      if (renderer && result.data.length > 0) {
         result.data = result.data.map((row: any) => {
           const transformed = { ...row };
           // Keep computed cell output separate from the source row so the UI can
           // render rich columns without losing access to the original fields.
-          tablePresenter.columns.forEach((col: any, index) => {
+          renderer.columns.forEach((col: any, index) => {
             if (typeof col !== "string" && "renderCell" in col) {
               // The index here must stay aligned with serializeColumns() so the
               // browser knows which computed display value belongs to which

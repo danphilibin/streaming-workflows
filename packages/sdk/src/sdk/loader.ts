@@ -41,11 +41,11 @@ export type ColumnDef<TRow> =
   | AccessorColumn<TRow>
   | RenderColumn<TRow>;
 
-/** Reusable table presenter for a row type */
-export type PresenterDef<TRow = unknown> = {
-  __brand: "presenter";
+/** Reusable table renderer for a row type */
+export type TableRendererDef<TRow = unknown> = {
+  __brand: "table_renderer";
   __row: TRow;
-  /** Stable server-side lookup key for reapplying this presenter on fetches */
+  /** Stable server-side lookup key for reapplying this table renderer on fetches */
   name: string;
   columns: ColumnDef<TRow>[];
 };
@@ -141,13 +141,13 @@ export function loader(...args: any[]): any {
   };
 }
 
-/** Create a named presenter that can be reused across loader-backed tables */
-export function presenter<TRow>(
+/** Create a named table renderer that can be reused across loader-backed tables */
+export function tableRenderer<TRow>(
   name: string,
   config: { columns: ColumnDef<TRow>[] },
-): PresenterDef<TRow> {
+): TableRendererDef<TRow> {
   return {
-    __brand: "presenter" as const,
+    __brand: "table_renderer" as const,
     __row: undefined as TRow,
     name,
     columns: config.columns,
@@ -168,9 +168,9 @@ export type TableOutputLoader<TRow = unknown> = {
   source: LoaderRef<TRow>;
   pageSize?: number;
   columns?: ColumnDef<TRow>[];
-  // Presenters are the reusable, named version of table display logic.
-  // Inline columns still work, but presenters avoid tying rendering to one run.
-  presenter?: PresenterDef<TRow>;
+  // Table renderers are the reusable, named version of table display logic.
+  // Inline columns still work, but a table renderer avoids tying rendering to one run.
+  tableRenderer?: TableRendererDef<TRow>;
 };
 
 /** Helper to check if output.table was called with a loader source */
