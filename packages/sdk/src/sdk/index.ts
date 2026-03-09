@@ -2,7 +2,7 @@ export { createWorkflow, RelayWorkflow } from "./cf-workflow";
 export { RelayDurableObject } from "./cf-durable-object";
 export { httpHandler } from "./cf-http";
 export { RelayMcpAgent } from "./cf-mcp-agent";
-export { loader, presenter } from "./loader";
+export { loader, tableRenderer } from "./loader";
 
 export {
   type StreamMessage,
@@ -43,7 +43,7 @@ export type {
   PaginationParams,
   ColumnDef,
   CellValue,
-  PresenterDef,
+  TableRendererDef,
 } from "./loader";
 
 export type WorkflowStatus =

@@ -19,7 +19,11 @@ import {
   type StreamMessage,
 } from "../isomorphic/messages";
 import type { OutputBlock, OutputButtonDef } from "../isomorphic/output";
-import { getWorkflow, registerPresenter, registerWorkflow } from "./registry";
+import {
+  getWorkflow,
+  registerTableRenderer,
+  registerWorkflow,
+} from "./registry";
 import type { WorkflowParams } from "../isomorphic/registry-types";
 import {
   type LoaderDef,
@@ -269,17 +273,17 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
 
   // Build the fetch path for a loader-backed table. We assemble it on the
   // server so the browser does not need to know about step IDs, bound params,
-  // or which presenter should run for the returned rows.
+  // or which table renderer should run for the returned rows.
   private buildLoaderPath(opts: {
     workflow: string;
     name: string;
     stepId: string;
-    presenterName?: string;
+    tableRendererName?: string;
     params: Record<string, unknown>;
   }): string {
     const search = new URLSearchParams({ stepId: opts.stepId });
-    if (opts.presenterName) {
-      search.set("presenter", opts.presenterName);
+    if (opts.tableRendererName) {
+      search.set("tableRenderer", opts.tableRendererName);
     }
     for (const [key, value] of Object.entries(opts.params)) {
       if (value !== undefined && value !== null) {
@@ -328,16 +332,16 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
     },
     table: async (opts: any) => {
       if (isLoaderTable(opts)) {
-        const { source, title, pageSize, presenter } = opts;
-        // Presenters own the display shape when provided; otherwise we fall back
+        const { source, title, pageSize, tableRenderer } = opts;
+        // Table renderers own the display shape when provided; otherwise we fall back
         // to any inline columns passed directly to output.table().
-        const columns = presenter?.columns ?? opts.columns;
+        const columns = tableRenderer?.columns ?? opts.columns;
         const stepId = this.stepName("output");
 
-        if (presenter) {
-          // Named presenters are reusable across tables, so we register them by
+        if (tableRenderer) {
+          // Named table renderers are reusable across tables, so we register them by
           // name and let the HTTP layer look them up later during page fetches.
-          registerPresenter(presenter);
+          registerTableRenderer(tableRenderer);
         }
 
         const block: OutputBlock = {
@@ -351,7 +355,7 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
               workflow: this.workflowSlug,
               name: source.name,
               stepId,
-              presenterName: presenter?.name,
+              tableRendererName: tableRenderer?.name,
               params: source.params,
             }),
             pageSize,
