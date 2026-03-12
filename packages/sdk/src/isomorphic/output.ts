@@ -64,13 +64,28 @@ const SerializedColumnDefSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
+export const NormalizedTableColumnSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+});
+
+export const NormalizedTableRowSchema = z.object({
+  rowKey: z.string().optional(),
+  cells: z.record(z.string(), z.string()),
+});
+
+export const LoaderTableDataSchema = z.object({
+  columns: z.array(NormalizedTableColumnSchema),
+  rows: z.array(NormalizedTableRowSchema),
+  totalCount: z.number().optional(),
+});
+
 export const OutputTableLoaderBlockSchema = z.object({
   type: z.literal("output.table_loader"),
   title: z.string().optional(),
   loader: z.object({
     path: z.string(),
     pageSize: z.number().optional(),
-    columns: z.array(SerializedColumnDefSchema).optional(),
   }),
 });
 
@@ -95,6 +110,9 @@ export type OutputLinkBlock = z.infer<typeof OutputLinkBlockSchema>;
 export type OutputButtonsBlock = z.infer<typeof OutputButtonsBlockSchema>;
 export type OutputMetadataBlock = z.infer<typeof OutputMetadataBlockSchema>;
 export type SerializedColumnDef = z.infer<typeof SerializedColumnDefSchema>;
+export type NormalizedTableColumn = z.infer<typeof NormalizedTableColumnSchema>;
+export type NormalizedTableRow = z.infer<typeof NormalizedTableRowSchema>;
+export type LoaderTableData = z.infer<typeof LoaderTableDataSchema>;
 export type OutputTableLoaderBlock = z.infer<
   typeof OutputTableLoaderBlockSchema
 >;

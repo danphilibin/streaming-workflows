@@ -1,5 +1,15 @@
 import { DurableObject } from "cloudflare:workers";
 import { type StreamMessage } from "../isomorphic/messages";
+import type { SerializedColumnDef } from "../isomorphic/output";
+
+type TableDescriptor = {
+  workflowSlug: string;
+  loaderName: string;
+  params: Record<string, unknown>;
+  tableRendererName?: string;
+  columns?: SerializedColumnDef[];
+  pageSize?: number;
+};
 
 /**
  * Durable Object that stores and streams messages for a workflow run.
@@ -88,6 +98,33 @@ export class RelayDurableObject extends DurableObject {
     if (request.method === "GET" && url.pathname === "/metadata") {
       const slug = await this.ctx.storage.get<string>("slug");
       return Response.json({ slug: slug ?? null });
+    }
+
+    const tableMatch = url.pathname.match(/^\/tables\/([^/]+)$/);
+
+    // POST /tables/:id - store table descriptor for later queries
+    if (request.method === "POST" && tableMatch) {
+      const [, tableId] = tableMatch;
+      const descriptor = await request.json<TableDescriptor>();
+      await this.ctx.storage.put(`table:${tableId}`, descriptor);
+      return new Response("OK");
+    }
+
+    // GET /tables/:id - retrieve stored table descriptor
+    if (request.method === "GET" && tableMatch) {
+      const [, tableId] = tableMatch;
+      const descriptor = await this.ctx.storage.get<TableDescriptor>(
+        `table:${tableId}`,
+      );
+
+      if (!descriptor) {
+        return Response.json(
+          { error: `Unknown table descriptor: ${tableId}` },
+          { status: 404 },
+        );
+      }
+
+      return Response.json(descriptor);
     }
 
     return new Response("Not found", { status: 404 });

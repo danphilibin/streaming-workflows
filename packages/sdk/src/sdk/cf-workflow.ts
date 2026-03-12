@@ -35,6 +35,7 @@ import {
   type LoaderDef,
   type LoaderRef,
   type LoaderRefs,
+  type SerializedColumnDef,
   type TableInputSingle,
   type TableInputMultiple,
   type TableOutputStatic,
@@ -217,10 +218,14 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
   // Current workflow slug (set during run)
   private workflowSlug = "";
 
+  // Current workflow run ID (used for DO-backed table descriptors)
+  private runId = "";
+
   async run(event: WorkflowEvent<WorkflowParams>, step: WorkflowStep) {
     this.step = step;
 
     this.stream = this.env.RELAY_DURABLE_OBJECT.getByName(event.instanceId);
+    this.runId = event.instanceId;
 
     const { name, data: prefilled } = event.payload;
     const definition = getWorkflow(name);
@@ -294,26 +299,38 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
     return `relay-${prefix}-${this.counter++}`;
   }
 
-  // Build the fetch path for a loader-backed table. We assemble it on the
-  // server so the browser does not need to know about step IDs, bound params,
-  // or which table renderer should run for the returned rows.
-  private buildLoaderPath(opts: {
-    workflow: string;
-    name: string;
+  // Build the browser-facing table query path. The browser only needs a stable
+  // table resource identifier; the DO holds the loader/display descriptor.
+  private buildLoaderPath(opts: { runId: string; stepId: string }): string {
+    return `workflows/${opts.runId}/table/${opts.stepId}/query`;
+  }
+
+  private async storeTableDescriptor(opts: {
     stepId: string;
-    tableRendererName?: string;
+    loaderName: string;
     params: Record<string, unknown>;
-  }): string {
-    const search = new URLSearchParams({ stepId: opts.stepId });
-    if (opts.tableRendererName) {
-      search.set("tableRenderer", opts.tableRendererName);
+    tableRendererName?: string;
+    columns?: SerializedColumnDef[];
+    pageSize?: number;
+  }): Promise<void> {
+    if (!this.stream) {
+      throw new Error("Relay not initialized.");
     }
-    for (const [key, value] of Object.entries(opts.params)) {
-      if (value !== undefined && value !== null) {
-        search.set(key, String(value));
-      }
-    }
-    return `workflows/${opts.workflow}/loader/${opts.name}?${search.toString()}`;
+
+    // Table descriptors are small durable records that let later table queries
+    // re-run the loader without encoding display/source state into the URL.
+    await this.stream.fetch(`http://internal/tables/${opts.stepId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workflowSlug: this.workflowSlug,
+        loaderName: opts.loaderName,
+        params: opts.params,
+        tableRendererName: opts.tableRendererName,
+        columns: opts.columns,
+        pageSize: opts.pageSize,
+      }),
+    });
   }
 
   private normalizeGroupArgs(
@@ -413,24 +430,20 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
         // Table renderers own the display shape when provided; otherwise we fall back
         // to any inline columns passed directly to output.table().
         const columns = tableRenderer?.columns ?? opts.columns;
+        const serializedColumns = serializeColumns(columns);
         const stepId = this.stepName("output");
 
         const block: OutputBlock = {
           type: "output.table_loader" as const,
           title,
           loader: {
-            // The client treats this as a ready-to-use fetch path. It already
-            // includes the extra server-side details needed to fetch the same
-            // loader data again for later pages/searches.
+            // The browser only gets a stable query endpoint. The DO stores the
+            // descriptor needed to resolve and render this table later on.
             path: this.buildLoaderPath({
-              workflow: this.workflowSlug,
-              name: source.name,
+              runId: this.runId,
               stepId,
-              tableRendererName: tableRenderer?.name,
-              params: source.params,
             }),
             pageSize,
-            columns: serializeColumns(columns),
           },
         };
 
@@ -439,6 +452,14 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
         }
 
         await this.step.do(stepId, async () => {
+          await this.storeTableDescriptor({
+            stepId,
+            loaderName: source.name,
+            params: source.params,
+            tableRendererName: tableRenderer?.name,
+            columns: serializedColumns,
+            pageSize,
+          });
           await this.sendMessage(createOutputMessage(stepId, block));
         });
       } else {
@@ -517,23 +538,28 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
         // Table renderers own the display shape when provided; otherwise fall
         // back to inline columns.
         const columns = tableRenderer?.columns ?? opts.columns;
+        const serializedColumns = serializeColumns(columns);
         const eventName = this.stepName("input");
 
         await this.step.do(`${eventName}-request`, async () => {
+          await this.storeTableDescriptor({
+            stepId: eventName,
+            loaderName: source.name,
+            params: source.params,
+            tableRendererName: tableRenderer?.name,
+            columns: serializedColumns,
+            pageSize,
+          });
           await this.sendMessage(
             createTableInputRequest(eventName, prompt, {
               type: "table",
               label: prompt,
               loader: {
                 path: this.buildLoaderPath({
-                  workflow: this.workflowSlug,
-                  name: source.name,
+                  runId: this.runId,
                   stepId: eventName,
-                  tableRendererName: tableRenderer?.name,
-                  params: source.params,
                 }),
                 pageSize,
-                columns: serializeColumns(columns),
               },
               rowKey,
               selection,

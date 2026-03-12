@@ -47,6 +47,9 @@ export type {
 } from "../isomorphic/input";
 
 export type {
+  LoaderTableData,
+  NormalizedTableColumn,
+  NormalizedTableRow,
   OutputBlock,
   OutputButtonDef,
   OutputMetadataBlock,

@@ -3,6 +3,10 @@ import {
   WorkflowParamsSchema,
   type StartWorkflowParams,
 } from "../isomorphic/registry-types";
+import type {
+  LoaderTableData,
+  SerializedColumnDef,
+} from "../isomorphic/output";
 import {
   startWorkflowRun,
   respondToWorkflowRun,
@@ -15,6 +19,22 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
+
+function normalizeCellValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") {
+    const obj = value as { label?: string; value?: string };
+    return obj.label ?? obj.value ?? JSON.stringify(value);
+  }
+  return String(value);
+}
+
+function deriveColumnKey(column: SerializedColumnDef, index: number): string {
+  if (column.type === "accessor") {
+    return column.accessorKey;
+  }
+  return `render_${index}`;
+}
 
 /**
  * HTTP handler for the Relay workflow engine.
@@ -164,83 +184,116 @@ async function handleRequest(req: Request, env: Env): Promise<Response> {
     return Response.json({ success: true });
   }
 
-  // GET /workflows/:slug/loader/:name - fetch paginated data from a loader
-  const loaderMatch = url.pathname.match(
-    /^\/workflows\/([^/]+)\/loader\/([^/]+)$/,
+  // POST /workflows/:id/table/:stepId/query - fetch paginated table data
+  const tableQueryMatch = url.pathname.match(
+    /^\/workflows\/([^/]+)\/table\/([^/]+)\/query$/,
   );
-  if (req.method === "GET" && loaderMatch) {
-    const [, workflowSlug, loaderName] = loaderMatch;
-    const definition = getWorkflow(workflowSlug);
+  if (req.method === "POST" && tableQueryMatch) {
+    const [, runId, stepId] = tableQueryMatch;
+    const stub = env.RELAY_DURABLE_OBJECT.getByName(runId);
+    const descriptorResponse = await stub.fetch(
+      `http://internal/tables/${stepId}`,
+    );
+
+    if (!descriptorResponse.ok) {
+      return Response.json(
+        { error: `Unknown table descriptor: ${stepId}` },
+        { status: 404 },
+      );
+    }
+
+    const descriptor = (await descriptorResponse.json()) as {
+      workflowSlug: string;
+      loaderName: string;
+      params: Record<string, unknown>;
+      tableRendererName?: string;
+      columns?: SerializedColumnDef[];
+      pageSize?: number;
+    };
+
+    const definition = getWorkflow(descriptor.workflowSlug);
 
     if (!definition) {
       return Response.json(
-        { error: `Unknown workflow: ${workflowSlug}` },
+        { error: `Unknown workflow: ${descriptor.workflowSlug}` },
         { status: 404 },
       );
     }
 
-    const loaderDef = definition.loaders?.[loaderName];
+    const loaderDef = definition.loaders?.[descriptor.loaderName];
     if (!loaderDef) {
       return Response.json(
-        { error: `Unknown loader: ${loaderName}` },
+        { error: `Unknown loader: ${descriptor.loaderName}` },
         { status: 404 },
       );
     }
 
-    // Parse pagination params from query string
-    const page = parseInt(url.searchParams.get("page") ?? "0", 10);
-    const pageSize = parseInt(url.searchParams.get("pageSize") ?? "20", 10);
-    const query = url.searchParams.get("query") ?? undefined;
-    // These query params are added by buildLoaderPath(). The browser does not
-    // need to know what they mean; it just uses the path the SDK gave it.
-    const stepId = url.searchParams.get("stepId") ?? undefined;
-    const tableRendererName =
-      url.searchParams.get("tableRenderer") ?? undefined;
-
-    // Parse custom params from the descriptor
-    const customParams: Record<string, unknown> = {};
-    if (loaderDef.paramDescriptor) {
-      for (const [key, type] of Object.entries(loaderDef.paramDescriptor)) {
-        const raw = url.searchParams.get(key);
-        if (raw !== null) {
-          if (type === "number") {
-            customParams[key] = parseFloat(raw);
-          } else if (type === "boolean") {
-            customParams[key] = raw === "true";
-          } else {
-            customParams[key] = raw;
-          }
-        }
-      }
-    }
+    const body = await req.json<{
+      page?: number;
+      pageSize?: number;
+      query?: string;
+    }>();
+    const page = body.page ?? 0;
+    const pageSize = body.pageSize ?? descriptor.pageSize ?? 20;
+    const query = body.query || undefined;
 
     const result = await loaderDef.fn(
-      { ...customParams, query, page, pageSize },
+      { ...descriptor.params, query, page, pageSize },
       env,
     );
+    const renderer = descriptor.tableRendererName
+      ? getTableRenderer(descriptor.tableRendererName)
+      : undefined;
+    const normalizedColumns =
+      descriptor.columns?.map((column, index) => ({
+        key: deriveColumnKey(column, index),
+        label: column.label,
+      })) ??
+      (result.data[0]
+        ? Object.keys(result.data[0] as Record<string, unknown>).map((key) => ({
+            key,
+            label: key,
+          }))
+        : []);
 
-    // Named table renderers are globally reusable and don't depend on per-run state.
-    if (tableRendererName) {
-      const renderer = getTableRenderer(tableRendererName);
-      if (renderer && result.data.length > 0) {
-        result.data = result.data.map((row: any) => {
-          const transformed = { ...row };
-          // Keep computed cell output separate from the source row so the UI can
-          // render rich columns without losing access to the original fields.
-          renderer.columns.forEach((col: any, index) => {
-            if (typeof col !== "string" && "renderCell" in col) {
-              // The index here must stay aligned with serializeColumns() so the
-              // browser knows which computed display value belongs to which
-              // column.
-              transformed[`__render_${index}`] = col.renderCell(row);
+    const payload: LoaderTableData = {
+      columns: normalizedColumns,
+      rows: result.data.map((row: any) => {
+        const cells = Object.fromEntries(
+          normalizedColumns.map((column, index) => {
+            const sourceColumn = descriptor.columns?.[index];
+            const rendererColumn = renderer?.columns[index];
+
+            let value: unknown;
+            if (rendererColumn) {
+              if (typeof rendererColumn === "string") {
+                value = row[rendererColumn];
+              } else if ("accessorKey" in rendererColumn) {
+                value = row[rendererColumn.accessorKey];
+              } else {
+                value = rendererColumn.renderCell(row);
+              }
+            } else if (sourceColumn?.type === "accessor") {
+              value = row[sourceColumn.accessorKey];
+            } else {
+              value = row[column.key];
             }
-          });
-          return transformed;
-        });
-      }
-    }
 
-    return Response.json(result);
+            return [column.key, normalizeCellValue(value)];
+          }),
+        );
+
+        return {
+          rowKey: loaderDef.rowKey
+            ? normalizeCellValue(row[loaderDef.rowKey])
+            : undefined,
+          cells,
+        };
+      }),
+      totalCount: result.totalCount,
+    };
+
+    return Response.json(payload);
   }
 
   return new Response("Not Found", { status: 404 });
