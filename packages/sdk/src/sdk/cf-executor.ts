@@ -22,7 +22,7 @@ import {
   createWorkflowComplete,
   type StreamMessage,
 } from "../isomorphic/messages";
-import type { OutputBlock } from "../isomorphic/output";
+import type { OutputBlock, SerializedColumnDef } from "../isomorphic/output";
 import { getWorkflow } from "./registry";
 import type {
   RelayOutput,
@@ -30,6 +30,22 @@ import type {
   RelayConfirmFn,
   RelayContext,
 } from "./cf-workflow";
+
+// ── Table Descriptors ────────────────────────────────────────────────
+
+/**
+ * Durable record stored alongside the run. Describes how to fetch and
+ * render a loader-backed table so later browser queries can re-run the
+ * loader without encoding display/source state into the URL.
+ */
+type TableDescriptor = {
+  workflowSlug: string;
+  loaderName: string;
+  params: Record<string, unknown>;
+  tableRendererName?: string;
+  columns?: SerializedColumnDef[];
+  pageSize?: number;
+};
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -171,6 +187,35 @@ export class RelayExecutor extends DurableObject<Env> {
 
       const result = await this.replay();
       return Response.json(result);
+    }
+
+    // ── Table descriptors ──────────────────────────────────────────
+
+    const tableMatch = url.pathname.match(/^\/tables\/([^/]+)$/);
+
+    // POST /tables/:id — store table descriptor for later queries
+    if (request.method === "POST" && tableMatch) {
+      const [, tableId] = tableMatch;
+      const descriptor = await request.json<TableDescriptor>();
+      await this.ctx.storage.put(`table:${tableId}`, descriptor);
+      return new Response("OK");
+    }
+
+    // GET /tables/:id — retrieve stored table descriptor
+    if (request.method === "GET" && tableMatch) {
+      const [, tableId] = tableMatch;
+      const descriptor = await this.ctx.storage.get<TableDescriptor>(
+        `table:${tableId}`,
+      );
+
+      if (!descriptor) {
+        return Response.json(
+          { error: `Unknown table descriptor: ${tableId}` },
+          { status: 404 },
+        );
+      }
+
+      return Response.json(descriptor);
     }
 
     return new Response("Not found", { status: 404 });

@@ -134,6 +134,7 @@ The handler context (`RelayContext`) passed to every workflow:
 | `input.select(label, options)`               | `=> InputFieldBuilder<string>`   | Awaitable select field builder                          |
 | `input.number(label, options?)`              | `=> InputFieldBuilder<number>`   | Awaitable number field builder                          |
 | `input.checkbox(label, options?)`            | `=> InputFieldBuilder<boolean>`  | Awaitable checkbox field builder                        |
+| `input.table(options)`                       | `=> Promise<TRow \| TRow[]>`     | Select rows from a loader-backed table and resolve them |
 | `input.group(title?, fields, options?)`      | `=> Promise<{ ...fields }>`      | Compose multiple field builders into one interaction    |
 | `input(prompt, { buttons })`                 | `=> Promise<{ value, $choice }>` | Text input with custom buttons                          |
 | `loading(msg, callback)`                     | `(string, cb) => Promise<void>`  | Shows spinner during async work                         |
@@ -151,31 +152,46 @@ The handler context (`RelayContext`) passed to every workflow:
 | `POST` | `/workflows`                         | Creates a new workflow instance, returns `{ id, name }` |
 | `GET`  | `/workflows/:id/stream`              | Proxies to the executor DO's NDJSON stream              |
 | `POST` | `/workflows/:id/event/:name`         | Submits user response (input value or confirm decision) |
-| `POST` | `/workflows/:id/table/:stepId/query` | Queries a loader-backed table for pagination/search     |
+| `POST` | `/workflows/:id/table/:stepId/query` | Runs a DO-backed table query for pagination/search      |
 
-## Loaders And Presenters
+## Loaders And Table Renderers
 
 Loaders let a workflow emit a table without persisting all rows into the NDJSON
-stream. Instead, `output.table({ source, ... })` stores a small table
-descriptor in the run Durable Object and streams only a stable query endpoint.
-The browser pages through that table by POSTing transient browsing state later.
+stream. Instead, `output.table({ source, ... })` streams only table metadata and
+the browser queries pages on demand via
+`POST /workflows/:id/table/:stepId/query`.
 
 The loader itself is still registered globally with the workflow definition, but
 the handler receives a serializable `LoaderRef` rather than a direct callback.
-That ref captures any bound params from the workflow run and is resolved against
-the stored descriptor when the table query route executes.
+That ref captures any bound params from the workflow run. When a table is
+emitted, `RelayExecutor` stores a small table descriptor in the run's Durable
+Object keyed by `stepId`. Later browser queries use that descriptor to
+reconstruct the loader call server-side.
 
-Table descriptors live in the run DO keyed by `stepId` and hold the durable
-table contract:
+Table renderers are the reusable, named version of table display logic. They
+hold column definitions, including `renderCell` callbacks, on the server side.
+When a loader-backed table uses a table renderer, the streamed block only includes:
 
-- loader name
-- bound params
-- table renderer name or serialized columns
-- pagination defaults and row-key metadata
+- a server-built `loader.path` that points at the run/step query endpoint
+- optional `pageSize`
 
-The query route receives only transient interaction state like `page`,
-`pageSize`, and `query`, then the server re-runs the loader and returns a
-normalized `{ columns, rows, totalCount }` payload to the frontend.
+The `loader.path` is treated as opaque browser-side, but it is now just a stable
+resource path. The data-source and display configuration live in Durable Object
+storage rather than in the URL.
+
+The loader fetch response is display-oriented:
+
+```ts
+{
+  columns: [{ key: "email", label: "Email" }],
+  rows: [{ rowKey: "user_123", cells: { email: "jane@example.com" } }],
+  totalCount: 42,
+}
+```
+
+This keeps render callbacks and transport-specific normalization out of the UI.
+The React app just fetches, renders server-provided columns/cells, manages
+selection state, and submits selected `rowKey` values back to the workflow.
 
 ### Call-response API (agents)
 

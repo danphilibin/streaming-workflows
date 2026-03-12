@@ -112,9 +112,9 @@ export type LoaderRef<TRow = unknown> = {
   __brand: "loader_ref";
   __row: TRow;
   name: string;
-  // These params are captured during the workflow run, then copied into the
-  // server-built loader path so later page/search requests can fetch the same
-  // scoped data without re-running workflow code.
+  // These params are captured during the workflow run, then persisted into a
+  // DO-backed table descriptor so later page/search requests can fetch the
+  // same scoped data without re-running workflow code.
   params: Record<string, unknown>;
   /** Carried from the loader definition so `input.table()` can validate selection. */
   rowKey?: string;

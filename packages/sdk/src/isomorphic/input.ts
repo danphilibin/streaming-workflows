@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { SerializedColumnDefSchema } from "./output";
 
 /**
  * Input field definition schemas for structured input
@@ -42,7 +41,6 @@ const TableFieldSchema = z.object({
   loader: z.object({
     path: z.string(),
     pageSize: z.number().optional(),
-    columns: z.array(SerializedColumnDefSchema).optional(),
   }),
   /** Field name used to identify rows for selection (defaults to "id") */
   rowKey: z.string(),
