@@ -8,13 +8,7 @@ export type WorkflowDefinition = {
   description?: string;
   handler: RelayHandler;
   input?: InputSchema;
-  loaders?: Record<
-    string,
-    {
-      fn: LoaderDef["fn"];
-      paramDescriptor?: LoaderDef["paramDescriptor"];
-    }
-  >;
+  loaders?: Record<string, Omit<LoaderDef, "__brand">>;
 };
 
 const workflows: Map<string, WorkflowDefinition> = new Map();
@@ -38,13 +32,7 @@ export function registerWorkflow(
   handler: RelayHandler,
   input?: InputSchema,
   description?: string,
-  loaders?: Record<
-    string,
-    {
-      fn: LoaderDef["fn"];
-      paramDescriptor?: LoaderDef["paramDescriptor"];
-    }
-  >,
+  loaders?: Record<string, Omit<LoaderDef, "__brand">>,
 ): void {
   const slug = slugify(title);
   workflows.set(slug, {

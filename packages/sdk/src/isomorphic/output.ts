@@ -52,7 +52,7 @@ export const OutputMetadataBlockSchema = z.object({
   ),
 });
 
-const SerializedColumnDefSchema = z.discriminatedUnion("type", [
+export const SerializedColumnDefSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("accessor"),
     label: z.string(),

@@ -219,23 +219,33 @@ async function handleRequest(req: Request, env: Env): Promise<Response> {
       env,
     );
 
-    // Named table renderers are globally reusable and don't depend on per-run state.
+    // When a table renderer is present, build display-only rows: only the
+    // columns the renderer exposes (accessor values + renderCell outputs) plus
+    // the rowKey identity field. This keeps source row data on the server.
     if (tableRendererName) {
       const renderer = getTableRenderer(tableRendererName);
       if (renderer && result.data.length > 0) {
+        const rowKeyField = loaderDef.rowKey;
+
         result.data = result.data.map((row: any) => {
-          const transformed = { ...row };
-          // Keep computed cell output separate from the source row so the UI can
-          // render rich columns without losing access to the original fields.
+          const display: Record<string, unknown> = {};
+
+          // Always include the rowKey so the client can identify rows
+          if (rowKeyField) {
+            display[rowKeyField] = row[rowKeyField];
+          }
+
           renderer.columns.forEach((col: any, index) => {
-            if (typeof col !== "string" && "renderCell" in col) {
-              // The index here must stay aligned with serializeColumns() so the
-              // browser knows which computed display value belongs to which
-              // column.
-              transformed[`__render_${index}`] = col.renderCell(row);
+            if (typeof col === "string") {
+              display[col] = row[col];
+            } else if ("accessorKey" in col) {
+              display[col.accessorKey] = row[col.accessorKey];
+            } else if ("renderCell" in col) {
+              display[`__render_${index}`] = col.renderCell(row);
             }
           });
-          return transformed;
+
+          return display;
         });
       }
     }

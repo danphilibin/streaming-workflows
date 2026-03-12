@@ -16,10 +16,19 @@ const userTableRenderer = tableRenderer<User>("user-table", {
 export const browseUsers = createWorkflow({
   name: "Users",
   loaders: {
-    users: loader(async ({ query, page, pageSize }) => {
-      return db.users.findMany({ query, page, pageSize });
+    // Config-object form: rowKey + resolve enable input.table() to resolve
+    // selected row identities back to full source rows on the server.
+    users: loader({
+      rowKey: "id",
+      load: async ({ query, page, pageSize }) => {
+        return db.users.findMany({ query, page, pageSize });
+      },
+      resolve: async ({ keys }) => {
+        return db.users.findByIds(keys);
+      },
     }),
 
+    // Simple function form still works for output-only loaders
     deptUsers: loader(
       { department: "string" },
       async ({ department, query, page, pageSize }) => {
@@ -29,14 +38,21 @@ export const browseUsers = createWorkflow({
   },
 
   handler: async ({ input, output, loaders }) => {
-    // All users — auto-derive columns
-    // await output.table({
-    //   title: "All Users",
-    //   source: loaders.users,
-    //   tableRenderer: userTableRenderer,
-    //   pageSize: 10,
-    // });
+    // Let the user pick a user from the paginated table.
+    // The client only sees display columns + rowKey. On submit it sends
+    // the rowKey values; the server calls resolve() to get the full rows.
+    const selectedUser = await input.table({
+      prompt: "Pick a user to view",
+      source: loaders.users,
+      tableRenderer: userTableRenderer,
+      pageSize: 5,
+    });
 
+    await output.markdown(
+      `You selected **${selectedUser.name}** (${selectedUser.email})`,
+    );
+
+    // Now pick a department and show a department-scoped table
     const { department } = await input("Select a department", {
       department: {
         type: "select",
@@ -48,7 +64,7 @@ export const browseUsers = createWorkflow({
       },
     });
 
-    // Department-scoped view
+    // Department-scoped view (output, not input)
     await output.table({
       title: department,
       source:
@@ -56,7 +72,6 @@ export const browseUsers = createWorkflow({
           ? loaders.users
           : loaders.deptUsers({ department }),
       pageSize: 5,
-      // columns: ["name", "email", "department", "role"],
       tableRenderer: userTableRenderer,
     });
   },

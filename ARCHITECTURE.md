@@ -125,7 +125,7 @@ The handler context (`RelayContext`) passed to every workflow:
 | `POST` | `/workflows/:id/event/:name`    | Submits user response (input value or confirm decision) |
 | `GET`  | `/workflows/:slug/loader/:name` | Runs a loader fetch for table pagination/search         |
 
-## Loaders And Presenters
+## Loaders And Table Renderers
 
 Loaders let a workflow emit a table without persisting all rows into the NDJSON
 stream. Instead, `output.table({ source, ... })` streams only table metadata and
@@ -136,9 +136,9 @@ the handler receives a serializable `LoaderRef` rather than a direct callback.
 That ref captures any bound params from the workflow run and is later turned into
 a server-built fetch path by `RelayWorkflow`.
 
-Presenters are the reusable, named version of table display logic. They hold
-column definitions, including `renderCell` callbacks, on the server side. When a
-loader-backed table uses a presenter, the streamed block only includes:
+Table renderers are the reusable, named version of table display logic. They
+hold column definitions, including `renderCell` callbacks, on the server side.
+When a loader-backed table uses a table renderer, the streamed block only includes:
 
 - a server-built `loader.path` for later fetches
 - serialized column metadata for the browser renderer

@@ -8,6 +8,7 @@ export {
   type OutputMessage,
   type InputRequestMessage,
   type InputReceivedMessage,
+  type InputTableConfig,
   type LoadingMessage,
   type ConfirmRequestMessage,
   type ConfirmReceivedMessage,

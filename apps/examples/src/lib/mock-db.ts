@@ -89,6 +89,11 @@ export const db = {
       return { data, totalCount: filtered.length };
     },
 
+    async findByIds(ids: string[]): Promise<User[]> {
+      const idSet = new Set(ids);
+      return USERS.filter((u) => idSet.has(u.id));
+    },
+
     async findByDepartment(
       department: string,
       params: QueryParams,

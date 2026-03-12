@@ -5,7 +5,11 @@ import {
   InputSchemaSchema,
   normalizeButtons,
 } from "./input";
-import { type OutputBlock, OutputBlockSchema } from "./output";
+import {
+  type OutputBlock,
+  OutputBlockSchema,
+  SerializedColumnDefSchema,
+} from "./output";
 
 /**
  * Stream message schemas
@@ -21,12 +25,30 @@ const NormalizedButtonSchema = z.object({
   intent: z.enum(["primary", "secondary", "danger"]),
 });
 
+/** When present on an input_request, the frontend renders a selectable table
+ * instead of a form. The loader config reuses the same shape as output.table_loader. */
+const InputTableConfigSchema = z.object({
+  loader: z.object({
+    path: z.string(),
+    pageSize: z.number().optional(),
+    columns: z.array(SerializedColumnDefSchema).optional(),
+  }),
+  /** Field name used to identify rows for selection (defaults to "id") */
+  rowKey: z.string(),
+  /** Whether the user can select one row or many */
+  selection: z.enum(["single", "multiple"]),
+});
+
+export type InputTableConfig = z.infer<typeof InputTableConfigSchema>;
+
 export const InputRequestMessageSchema = z.object({
   id: z.string(),
   type: z.literal("input_request"),
   prompt: z.string(),
   schema: InputSchemaSchema,
   buttons: z.array(NormalizedButtonSchema),
+  /** When present, this input_request is a table selection instead of a form */
+  table: InputTableConfigSchema.optional(),
 });
 
 export const InputReceivedMessageSchema = z.object({
@@ -97,6 +119,7 @@ export function createInputRequest(
   prompt: string,
   schema?: InputSchema,
   buttons?: ButtonDef[],
+  table?: InputTableConfig,
 ): InputRequestMessage {
   // Normalize simple prompts to a single text field schema
   const normalizedSchema: InputSchema = schema ?? {
@@ -108,6 +131,7 @@ export function createInputRequest(
     prompt,
     schema: normalizedSchema,
     buttons: normalizeButtons(buttons),
+    ...(table && { table }),
   };
 }
 

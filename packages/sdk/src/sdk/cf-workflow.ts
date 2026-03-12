@@ -27,6 +27,8 @@ import {
   type LoaderRefs,
   type TableOutputStatic,
   type TableOutputLoader,
+  type TableInputSingle,
+  type TableInputMultiple,
   isLoaderTable,
   serializeColumns,
 } from "./loader";
@@ -50,6 +52,15 @@ export type RelayLoadingFn = (
  * Confirm function type - prompts user for approval
  */
 export type RelayConfirmFn = (message: string) => Promise<boolean>;
+
+/**
+ * Table selection function type - prompts user to pick rows from a
+ * loader-backed table and returns the selected source row(s).
+ */
+export type RelayInputTableFn = {
+  <TRow>(opts: TableInputSingle<TRow>): Promise<TRow>;
+  <TRow>(opts: TableInputMultiple<TRow>): Promise<TRow[]>;
+};
 
 export type RelayOutput = {
   markdown: (content: string) => Promise<void>;
@@ -76,7 +87,7 @@ export type RelayOutput = {
  */
 export type RelayContext = {
   step: WorkflowStep;
-  input: RelayInputFn;
+  input: RelayInputFn & { table: RelayInputTableFn };
   output: RelayOutput;
   loading: RelayLoadingFn;
   confirm: RelayConfirmFn;
@@ -120,7 +131,12 @@ export function createWorkflow(config: {
     ? Object.fromEntries(
         Object.entries(config.loaders).map(([name, def]) => [
           name,
-          { fn: def.fn, paramDescriptor: def.paramDescriptor },
+          {
+            fn: def.fn,
+            paramDescriptor: def.paramDescriptor,
+            rowKey: def.rowKey,
+            resolve: def.resolve,
+          },
         ]),
       )
     : undefined;
@@ -159,6 +175,7 @@ function buildLoaderRefs(
           __row: undefined as any,
           name,
           params,
+          rowKey: def.rowKey,
         }) as LoaderRef;
     } else {
       // No custom params — return a bare ref
@@ -167,6 +184,7 @@ function buildLoaderRefs(
         __row: undefined as any,
         name,
         params: {},
+        rowKey: def.rowKey,
       } as LoaderRef;
     }
   }
@@ -387,51 +405,137 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
 
   /**
    * Request input from the user and wait for a response.
+   * Also exposes `input.table()` for loader-backed table selection.
    */
-  input: RelayInputFn = (async (
-    prompt: string,
-    schemaOrOptions?: InputSchema | InputOptions,
-    maybeOptions?: InputOptions,
-  ) => {
-    if (!this.step) {
-      throw new Error("Relay not initialized. Call initRelay() first.");
-    }
-
-    const { schema, buttons } = this.normalizeInputArgs(
-      schemaOrOptions,
-      maybeOptions,
-    );
-
-    const eventName = this.stepName("input");
-
-    await this.step.do(`${eventName}-request`, async () => {
-      await this.sendMessage(
-        createInputRequest(eventName, prompt, schema, buttons),
-      );
-    });
-
-    const event = await this.step.waitForEvent(eventName, {
-      type: eventName,
-      timeout: "5 minutes",
-    });
-
-    const payload = event.payload as Record<string, unknown>;
-
-    // With buttons: always return object (with $choice)
-    if (buttons) {
-      if (!schema) {
-        return { value: payload.input, $choice: payload.$choice };
+  input: RelayInputFn & { table: RelayInputTableFn } = Object.assign(
+    (async (
+      prompt: string,
+      schemaOrOptions?: InputSchema | InputOptions,
+      maybeOptions?: InputOptions,
+    ) => {
+      if (!this.step) {
+        throw new Error("Relay not initialized. Call initRelay() first.");
       }
+
+      const { schema, buttons } = this.normalizeInputArgs(
+        schemaOrOptions,
+        maybeOptions,
+      );
+
+      const eventName = this.stepName("input");
+
+      await this.step.do(`${eventName}-request`, async () => {
+        await this.sendMessage(
+          createInputRequest(eventName, prompt, schema, buttons),
+        );
+      });
+
+      const event = await this.step.waitForEvent(eventName, {
+        type: eventName,
+        timeout: "5 minutes",
+      });
+
+      const payload = event.payload as Record<string, unknown>;
+
+      // With buttons: always return object (with $choice)
+      if (buttons) {
+        if (!schema) {
+          return { value: payload.input, $choice: payload.$choice };
+        }
+        return payload;
+      }
+
+      // No buttons: unwrap simple case
+      if (!schema) {
+        return payload.input;
+      }
+
       return payload;
-    }
+    }) as RelayInputFn,
+    {
+      table: (async (opts: TableInputSingle<any> | TableInputMultiple<any>) => {
+        if (!this.step) {
+          throw new Error("Relay not initialized. Call initRelay() first.");
+        }
 
-    // No buttons: unwrap simple case
-    if (!schema) {
-      return payload.input;
-    }
+        const { prompt, source, pageSize, tableRenderer } = opts;
+        const selection = opts.selection ?? "single";
 
-    return payload;
-  }) as RelayInputFn;
+        // rowKey comes from the loader definition, not the call site.
+        const rowKey = source.rowKey;
+        if (!rowKey) {
+          throw new Error(
+            `input.table() requires a loader with rowKey. ` +
+              `Use the config-object form of loader() with rowKey and resolve.`,
+          );
+        }
+
+        // Table renderers own the display shape when provided; otherwise fall
+        // back to inline columns.
+        const columns = tableRenderer?.columns ?? opts.columns;
+        const eventName = this.stepName("input");
+
+        await this.step.do(`${eventName}-request`, async () => {
+          await this.sendMessage(
+            createInputRequest(
+              eventName,
+              prompt,
+              undefined, // no form schema — the table config drives the UI
+              undefined, // no custom buttons
+              {
+                loader: {
+                  path: this.buildLoaderPath({
+                    workflow: this.workflowSlug,
+                    name: source.name,
+                    stepId: eventName,
+                    tableRendererName: tableRenderer?.name,
+                    params: source.params,
+                  }),
+                  pageSize,
+                  columns: serializeColumns(columns),
+                },
+                rowKey,
+                selection,
+              },
+            ),
+          );
+        });
+
+        const event = await this.step.waitForEvent(eventName, {
+          type: eventName,
+          timeout: "5 minutes",
+        });
+
+        // The client sends back { rowKeys: [...] }. We resolve them to full
+        // source rows server-side by calling the loader's resolve function.
+        const payload = event.payload as Record<string, unknown>;
+        const rowKeys = payload.rowKeys as string[];
+
+        // Look up the loader definition to call its resolve function.
+        const definition = getWorkflow(this.workflowSlug);
+        const loaderDef = definition?.loaders?.[source.name];
+        if (!loaderDef?.resolve) {
+          throw new Error(
+            `Loader "${source.name}" does not have a resolve function.`,
+          );
+        }
+
+        // Resolve row keys to full source rows inside a step for durability.
+        const rows = await this.step.do(`${eventName}-resolve`, async () => {
+          return loaderDef.resolve!(
+            { keys: rowKeys, ...source.params },
+            this.env,
+          );
+        });
+
+        // Single selection returns the row directly; multiple returns the array.
+        if (selection === "single") {
+          return rows[0];
+        }
+        return rows;
+      }) as RelayInputTableFn,
+    },
+  );
 
   /**
    * Show a loading indicator while performing async work.

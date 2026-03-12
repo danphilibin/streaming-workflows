@@ -1,5 +1,6 @@
 import { type StreamMessage } from "relay-sdk/client";
 import { InputRequestMessage } from "./InputRequestMessage";
+import { InputTableMessage } from "./InputTableMessage";
 import { ConfirmRequestMessage } from "./ConfirmRequestMessage";
 import { LoadingMessage } from "./LoadingMessage";
 import { OutputMessage } from "./OutputMessage";
@@ -85,6 +86,17 @@ export function MessageList({
             return <OutputMessage key={message.id} block={message.block} />;
 
           case "input_request":
+            if (message.table) {
+              return (
+                <InputTableMessage
+                  key={message.id}
+                  message={message}
+                  onSubmit={onSubmitInput}
+                  submittedValue={submittedValue}
+                />
+              );
+            }
+
             return (
               <InputRequestMessage
                 key={message.id}
