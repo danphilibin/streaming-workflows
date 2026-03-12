@@ -90,7 +90,10 @@ export function createWorkflow<
   input: T;
   loaders?: L;
   handler: (
-    ctx: RelayContext & { data: InferBuilderGroupResult<T>; loaders: LoaderRefs<L> },
+    ctx: RelayContext & {
+      data: InferBuilderGroupResult<T>;
+      loaders: LoaderRefs<L>;
+    },
   ) => Promise<void>;
 }): void;
 export function createWorkflow<

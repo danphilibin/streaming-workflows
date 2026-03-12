@@ -37,16 +37,17 @@ export const browseUsers = createWorkflow({
     //   pageSize: 10,
     // });
 
-    const { department } = await input("Select a department", {
-      department: {
-        type: "select",
-        label: "Department",
-        options: ["All", ...DEPARTMENTS].map((department) => ({
-          value: department,
-          label: department,
-        })),
+    const { department } = await input.group(
+      {
+        department: input.select("Department", {
+          options: ["All", ...DEPARTMENTS].map((department) => ({
+            value: department,
+            label: department,
+          })),
+        }),
       },
-    });
+      "Select a department",
+    );
 
     // Department-scoped view
     await output.table({
