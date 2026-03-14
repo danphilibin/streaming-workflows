@@ -192,17 +192,17 @@ type InputGroupFn = {
   <TFields extends InputFieldBuilders>(
     fields: TFields,
   ): Promise<InferBuilderGroupResult<TFields>>;
+  <TFields extends InputFieldBuilders>(
+    title: string,
+    fields: TFields,
+  ): Promise<InferBuilderGroupResult<TFields>>;
   <TFields extends InputFieldBuilders, const B extends readonly ButtonDef[]>(
     fields: TFields,
     options: InputOptions<B>,
   ): Promise<InferBuilderGroupResult<TFields> & { $choice: ButtonLabels<B> }>;
-  <TFields extends InputFieldBuilders>(
-    fields: TFields,
-    prompt: string,
-  ): Promise<InferBuilderGroupResult<TFields>>;
   <TFields extends InputFieldBuilders, const B extends readonly ButtonDef[]>(
+    title: string,
     fields: TFields,
-    prompt: string,
     options: InputOptions<B>,
   ): Promise<InferBuilderGroupResult<TFields> & { $choice: ButtonLabels<B> }>;
 };

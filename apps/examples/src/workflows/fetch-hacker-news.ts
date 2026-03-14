@@ -56,6 +56,7 @@ export const fetchHackernews = createWorkflow({
 
     // Let user pick a story
     const { story: selectedStoryId } = await input.group(
+      "Pick a story to explore:",
       {
         story: input.select("Story", {
           options: stories.map((s) => ({
@@ -64,7 +65,6 @@ export const fetchHackernews = createWorkflow({
           })),
         }),
       },
-      "Pick a story to explore:",
     );
 
     const selectedStory = stories.find((s) => String(s.id) === selectedStoryId);

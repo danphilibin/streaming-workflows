@@ -198,19 +198,26 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
   }
 
   private normalizeGroupArgs(
-    promptOrOptions?: string | InputOptions,
+    titleOrFields: string | InputFieldBuilders,
+    fieldsOrOptions?: InputFieldBuilders | InputOptions,
     maybeOptions?: InputOptions,
   ): {
-    prompt: string;
+    title: string;
+    fields: InputFieldBuilders;
     options: InputOptions | undefined;
   } {
-    if (typeof promptOrOptions === "string") {
-      return { prompt: promptOrOptions, options: maybeOptions };
+    if (typeof titleOrFields === "string") {
+      return {
+        title: titleOrFields,
+        fields: fieldsOrOptions as InputFieldBuilders,
+        options: maybeOptions,
+      };
     }
 
     return {
-      prompt: "",
-      options: promptOrOptions,
+      title: "",
+      fields: titleOrFields,
+      options: fieldsOrOptions as InputOptions | undefined,
     };
   }
 
@@ -372,23 +379,24 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
           options: [...config.options],
         }),
       group: async (
-        fields: InputFieldBuilders,
-        promptOrOptions?: string | InputOptions,
+        titleOrFields: string | InputFieldBuilders,
+        fieldsOrOptions?: InputFieldBuilders | InputOptions,
         maybeOptions?: InputOptions,
       ) => {
-        const { prompt, options } = this.normalizeGroupArgs(
-          promptOrOptions,
+        const { title, fields, options } = this.normalizeGroupArgs(
+          titleOrFields,
+          fieldsOrOptions,
           maybeOptions,
         );
 
         const schema = compileInputFields(fields);
         return options
           ? this.requestSchemaInput(
-              prompt,
+              title,
               schema,
               options.buttons as ButtonDef[],
             )
-          : this.requestSchemaInput(prompt, schema);
+          : this.requestSchemaInput(title, schema);
       },
     },
   ) as RelayInputFn;

@@ -87,7 +87,7 @@ Playwright end-to-end tests.
 
 **Message protocol:** The `StreamMessage` Zod-validated discriminated union (on `type`) is the contract between SDK, DO, HTTP layer, and frontend. All message types are defined once in `isomorphic/messages.ts`.
 
-**Input schema / type inference:** Relay now has two builder entry points for two different phases. `field.*` is used at workflow definition time in `createWorkflow({ input })` to declare upfront inputs. `input.*` is used inside a running workflow handler to request interactive inputs, and `input.group()` composes multiple runtime field builders into one interaction. Both forms compile to `InputSchema` field definitions (`text`, `number`, `checkbox`, `select`) for the stream protocol and frontend renderer. `InputSchema` remains the transport/intermediate representation, not the primary public authoring API.
+**Input schema / type inference:** Relay now has two builder entry points for two different phases. `field.*` is used at workflow definition time in `createWorkflow({ input })` to declare upfront inputs. `input.*` is used inside a running workflow handler to request interactive inputs, and `input.group(title?, fields, options?)` composes multiple runtime field builders into one interaction. Both forms compile to `InputSchema` field definitions (`text`, `number`, `checkbox`, `select`) for the stream protocol and frontend renderer. `InputSchema` remains the transport/intermediate representation, not the primary public authoring API.
 
 **Dual API surface:** Both the interactive API (browser: stream + events) and the call-response API (agents: blocking POST) share the same core execution functions in `workflow-api.ts`, avoiding divergence.
 
@@ -117,7 +117,7 @@ The handler context (`RelayContext`) passed to every workflow:
 | `input.select(label, options)`               | `=> InputFieldBuilder<string>`   | Awaitable select field builder                          |
 | `input.number(label, options?)`              | `=> InputFieldBuilder<number>`   | Awaitable number field builder                          |
 | `input.checkbox(label, options?)`            | `=> InputFieldBuilder<boolean>`  | Awaitable checkbox field builder                        |
-| `input.group(fields, prompt?, options?)`     | `=> Promise<{ ...fields }>`      | Compose multiple field builders into one interaction    |
+| `input.group(title?, fields, options?)`      | `=> Promise<{ ...fields }>`      | Compose multiple field builders into one interaction    |
 | `input(prompt, { buttons })`                 | `=> Promise<{ value, $choice }>` | Text input with custom buttons                          |
 | `loading(msg, callback)`                     | `(string, cb) => Promise<void>`  | Shows spinner during async work                         |
 | `confirm(msg)`                               | `(string) => Promise<boolean>`   | Approve/reject dialog                                   |

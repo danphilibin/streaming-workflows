@@ -5,14 +5,11 @@ export const refund = createWorkflow({
   description:
     "Look up an order, select items, and process a refund with policy validation and approval gates.",
   handler: async ({ input, output, confirm }) => {
-    const { orderId } = await input.group(
-      {
-        orderId: input.text("Order ID", {
-          description: "Found in the confirmation email, e.g. ORD-12345",
-        }),
-      },
-      "Enter order information",
-    );
+    const { orderId } = await input.group("Enter order information", {
+      orderId: input.text("Order ID", {
+        description: "Found in the confirmation email, e.g. ORD-12345",
+      }),
+    });
 
     // Simulated order lookup
     const order = {
@@ -27,20 +24,17 @@ export const refund = createWorkflow({
     };
 
     // Step 2: Select items to refund
-    const selection = await input.group(
-      {
-        item_1: input.checkbox(
-          `${order.items[0].name} ($${order.items[0].price})`,
-        ),
-        item_2: input.checkbox(
-          `${order.items[1].name} ($${order.items[1].price})`,
-        ),
-        item_3: input.checkbox(
-          `${order.items[2].name} ($${order.items[2].price})`,
-        ),
-      },
-      "Select items to refund",
-    );
+    const selection = await input.group("Select items to refund", {
+      item_1: input.checkbox(
+        `${order.items[0].name} ($${order.items[0].price})`,
+      ),
+      item_2: input.checkbox(
+        `${order.items[1].name} ($${order.items[1].price})`,
+      ),
+      item_3: input.checkbox(
+        `${order.items[2].name} ($${order.items[2].price})`,
+      ),
+    });
 
     const selectedItems = order.items.filter((_, i) => {
       const key = `item_${i + 1}` as keyof typeof selection;
@@ -58,21 +52,18 @@ export const refund = createWorkflow({
     );
 
     // Step 3: Get refund reason
-    const { reason, reasonDetail } = await input.group(
-      {
-        reason: input.select("Reason", {
-          options: [
-            { value: "defective", label: "Defective product" },
-            { value: "wrong_item", label: "Wrong item received" },
-            { value: "changed_mind", label: "Changed mind" },
-            { value: "duplicate", label: "Duplicate order" },
-            { value: "other", label: "Other" },
-          ],
-        }),
-        reasonDetail: input.text("Additional details (optional)"),
-      },
-      "Refund reason",
-    );
+    const { reason, reasonDetail } = await input.group("Refund reason", {
+      reason: input.select("Reason", {
+        options: [
+          { value: "defective", label: "Defective product" },
+          { value: "wrong_item", label: "Wrong item received" },
+          { value: "changed_mind", label: "Changed mind" },
+          { value: "duplicate", label: "Duplicate order" },
+          { value: "other", label: "Other" },
+        ],
+      }),
+      reasonDetail: input.text("Additional details (optional)"),
+    });
 
     await output.table({
       title: "Refund Summary",

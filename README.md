@@ -115,13 +115,10 @@ createWorkflow({
   handler: async ({ input, output, loading }) => {
     const name = await input.text("What is your name?");
 
-    const { email, subscribe } = await input.group(
-      {
-        email: input.text("Email"),
-        subscribe: input.checkbox("Subscribe?"),
-      },
-      "More info",
-    );
+    const { email, subscribe } = await input.group("More info", {
+      email: input.text("Email"),
+      subscribe: input.checkbox("Subscribe?"),
+    });
 
     await loading("Processing...", async ({ complete }) => {
       // do async work
