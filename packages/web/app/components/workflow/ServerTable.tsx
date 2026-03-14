@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Table } from "@cloudflare/kumo/components/table";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Loader } from "@cloudflare/kumo/components/loader";
 import type { LoaderTableData, RowKeyValue } from "relay-sdk/client";
 import { apiPath } from "../../lib/api";
+import { TableDisplay } from "./TableDisplay";
 
-interface PaginatedTableProps {
-  /** Loader endpoint for paginated server-side data. */
-  loader?: { path: string; pageSize?: number };
-  /** Pre-normalized static data — skips HTTP fetching when provided. */
-  initialData?: LoaderTableData;
+interface ServerTableProps {
+  loader: { path: string; pageSize?: number };
   title?: string;
   /** When set, rows become selectable with checkboxes. */
   selection?: "single" | "multiple";
@@ -19,23 +16,25 @@ interface PaginatedTableProps {
   disabled?: boolean;
 }
 
-export function PaginatedTable({
+/**
+ * Loader-backed table — fetches pages from the server via HTTP.
+ * Owns search debouncing and server-side pagination controls.
+ */
+export function ServerTable({
   loader,
-  initialData,
   title,
   selection,
   defaultSelectedKeys,
   onSelectionChange,
   disabled,
-}: PaginatedTableProps) {
-  const isStatic = !loader;
-  const pageSize = loader?.pageSize ?? 20;
+}: ServerTableProps) {
+  const pageSize = loader.pageSize ?? 20;
 
   const [page, setPage] = useState(0);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [data, setData] = useState<LoaderTableData | null>(initialData ?? null);
-  const [loading, setLoading] = useState(!disabled && !isStatic);
+  const [data, setData] = useState<LoaderTableData | null>(null);
+  const [loading, setLoading] = useState(!disabled);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [selectedKeys, setSelectedKeys] = useState<Set<RowKeyValue>>(
@@ -44,7 +43,6 @@ export function PaginatedTable({
 
   const fetchData = useCallback(
     async (p: number, q: string) => {
-      if (!loader) return;
       setLoading(true);
       setError(null);
       const url = apiPath(loader.path);
@@ -70,15 +68,14 @@ export function PaginatedTable({
         setLoading(false);
       }
     },
-    [loader, pageSize],
+    [loader.path, pageSize],
   );
 
-  // Only fetch for loader-backed tables — static tables use initialData directly.
   useEffect(() => {
-    if (!disabled && !isStatic) {
+    if (!disabled) {
       fetchData(page, debouncedQuery);
     }
-  }, [page, debouncedQuery, fetchData, disabled, isStatic]);
+  }, [page, debouncedQuery, fetchData, disabled]);
 
   // Notify parent when selection changes
   useEffect(() => {
@@ -113,7 +110,6 @@ export function PaginatedTable({
       } else {
         next.add(key);
       }
-
       return next;
     });
   };
@@ -133,7 +129,7 @@ export function PaginatedTable({
         <div className="text-base font-medium text-[#ddd]">{title}</div>
       )}
 
-      {!disabled && !isStatic && (
+      {!disabled && (
         <div className="flex items-center gap-3">
           <div className="w-64">
             <Input
@@ -152,53 +148,17 @@ export function PaginatedTable({
 
       {error ? (
         <div className="text-sm text-red-400">{error}</div>
-      ) : data && data.rows.length === 0 ? (
-        <div className="text-sm leading-relaxed text-kumo-subtle">
-          (no rows)
-        </div>
       ) : data ? (
-        <div className="overflow-x-auto">
-          <Table className="text-sm border border-[#222] rounded-md">
-            <Table.Header>
-              <Table.Row>
-                {selection && <Table.CheckHead />}
-                {data.columns.map((col) => (
-                  <Table.Head key={col.key}>{col.label}</Table.Head>
-                ))}
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {data.rows.map((row, rowIndex) => {
-                const key = row.rowKey ?? `${rowIndex}`;
-                const checked = selection ? selectedKeys.has(key) : false;
-
-                return (
-                  <Table.Row
-                    key={key}
-                    variant={checked ? "selected" : "default"}
-                    onClick={selection ? () => toggleRow(key) : undefined}
-                    className={selection ? "cursor-pointer" : undefined}
-                  >
-                    {selection && (
-                      <Table.CheckCell
-                        checked={checked}
-                        onValueChange={() => toggleRow(key)}
-                      />
-                    )}
-                    {data.columns.map((col) => (
-                      <Table.Cell key={col.key}>
-                        {row.cells[col.key] ?? ""}
-                      </Table.Cell>
-                    ))}
-                  </Table.Row>
-                );
-              })}
-            </Table.Body>
-          </Table>
-        </div>
+        <TableDisplay
+          columns={data.columns}
+          rows={data.rows}
+          selection={selection}
+          selectedKeys={selectedKeys}
+          onToggleRow={toggleRow}
+        />
       ) : null}
 
-      {!disabled && !isStatic && (
+      {!disabled && (
         <div className="flex items-center gap-3 text-sm text-kumo-subtle">
           <Button
             variant="secondary"

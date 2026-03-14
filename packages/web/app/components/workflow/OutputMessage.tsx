@@ -1,9 +1,9 @@
-import { type OutputBlock } from "relay-sdk/client";
+import { type OutputBlock, type LoaderTableData } from "relay-sdk/client";
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { CodeBlock } from "@cloudflare/kumo/components/code";
-import { Table } from "@cloudflare/kumo/components/table";
 import { Streamdown } from "streamdown";
-import { PaginatedTable } from "./PaginatedTable";
+import { ServerTable } from "./ServerTable";
+import { StaticTable } from "./StaticTable";
 
 interface OutputMessageProps {
   block: OutputBlock;
@@ -22,49 +22,27 @@ export function OutputMessage({ block }: OutputMessageProps) {
       return <Streamdown mode="static">{block.content}</Streamdown>;
 
     case "output.table": {
+      // Normalize the raw Record<string, string>[] into the same
+      // LoaderTableData shape that loader-backed tables use, so
+      // StaticTable can render both uniformly.
       const rows = block.data;
-      const columns =
+      const columnKeys =
         rows.length > 0
           ? Array.from(new Set(rows.flatMap((row) => Object.keys(row))))
           : [];
 
-      return (
-        <div className="space-y-2">
-          {block.title && (
-            <div className="text-base font-medium text-[#ddd]">
-              {block.title}
-            </div>
-          )}
-          {rows.length === 0 ? (
-            <div className="text-sm leading-relaxed text-kumo-subtle">
-              (no rows)
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table className="text-sm border border-[#222] rounded-md">
-                <Table.Header>
-                  <Table.Row>
-                    {columns.map((column) => (
-                      <Table.Head key={column}>{column}</Table.Head>
-                    ))}
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {rows.map((row, rowIndex) => (
-                    <Table.Row key={rowIndex}>
-                      {columns.map((column) => (
-                        <Table.Cell key={column}>
-                          {row[column] ?? ""}
-                        </Table.Cell>
-                      ))}
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table>
-            </div>
-          )}
-        </div>
-      );
+      const data: LoaderTableData = {
+        columns: columnKeys.map((key) => ({ key, label: key })),
+        rows: rows.map((row, index) => ({
+          rowKey: index,
+          cells: Object.fromEntries(
+            columnKeys.map((key) => [key, row[key] ?? ""]),
+          ),
+        })),
+        totalCount: rows.length,
+      };
+
+      return <StaticTable data={data} title={block.title} />;
     }
 
     case "output.code":
@@ -131,7 +109,7 @@ export function OutputMessage({ block }: OutputMessageProps) {
       );
 
     case "output.table_loader":
-      return <PaginatedTable loader={block.loader} title={block.title} />;
+      return <ServerTable loader={block.loader} title={block.title} />;
 
     case "output.metadata":
       return (
