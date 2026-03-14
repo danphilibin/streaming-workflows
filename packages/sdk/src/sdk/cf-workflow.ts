@@ -29,16 +29,23 @@ import {
   type StreamMessage,
 } from "../isomorphic/messages";
 import type { OutputBlock, OutputButtonDef } from "../isomorphic/output";
-import type { RowKeyValue } from "../isomorphic/table";
+import {
+  type RowKeyValue,
+  type LoaderTableData,
+  normalizeCellValue,
+} from "../isomorphic/table";
 import { getWorkflow, registerWorkflow } from "./registry";
 import type { WorkflowParams } from "../isomorphic/registry-types";
 import {
   type LoaderDef,
   type LoaderRef,
   type LoaderRefs,
+  type ColumnDef,
   type SerializedColumnDef,
   type TableInputSingle,
   type TableInputMultiple,
+  type TableInputStaticSingle,
+  type TableInputStaticMultiple,
   type TableOutputStatic,
   type TableOutputLoader,
   isLoaderTable,
@@ -66,9 +73,13 @@ export type RelayLoadingFn = (
 export type RelayConfirmFn = (message: string) => Promise<boolean>;
 
 /**
- * Table selection helper for interactive loader-backed tables.
+ * Table selection helper — supports both loader-backed and static tables.
+ * Static overloads are listed first so TypeScript prefers them when `data`
+ * is present (both shapes would otherwise match due to structural typing).
  */
 export type RelayInputTableFn = {
+  <TRow>(opts: TableInputStaticSingle<TRow>): Promise<TRow>;
+  <TRow>(opts: TableInputStaticMultiple<TRow>): Promise<TRow[]>;
   <TRow>(opts: TableInputSingle<TRow>): Promise<TRow>;
   <TRow>(opts: TableInputMultiple<TRow>): Promise<TRow[]>;
 };
@@ -337,6 +348,190 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
     });
   }
 
+  /**
+   * Normalize an array of source rows into the display-oriented LoaderTableData
+   * shape. Used by static input.table — the same shape the loader HTTP endpoint
+   * returns, so the client renders both modes identically.
+   */
+  private normalizeStaticTableData<TRow>(
+    data: TRow[],
+    rowKey: string,
+    columns?: ColumnDef<TRow>[],
+  ): LoaderTableData {
+    // Derive columns from the first row when none are specified.
+    const normalizedColumns = columns
+      ? columns.map((col, index) => {
+          if (typeof col === "string") return { key: col, label: col };
+          if ("accessorKey" in col)
+            return { key: col.accessorKey, label: col.label };
+          return { key: `render_${index}`, label: col.label };
+        })
+      : data[0]
+        ? Object.keys(data[0] as Record<string, unknown>).map((key) => ({
+            key,
+            label: key,
+          }))
+        : [];
+
+    return {
+      columns: normalizedColumns,
+      rows: data.map((row: any) => {
+        const cells = Object.fromEntries(
+          normalizedColumns.map((col, index) => {
+            const srcCol = columns?.[index];
+            let value: unknown;
+            if (
+              srcCol &&
+              typeof srcCol !== "string" &&
+              "renderCell" in srcCol
+            ) {
+              value = srcCol.renderCell(row);
+            } else {
+              value = row[col.key];
+            }
+            return [col.key, normalizeCellValue(value)];
+          }),
+        );
+
+        const rawKey = row[rowKey];
+        const typedKey =
+          typeof rawKey === "string" || typeof rawKey === "number"
+            ? rawKey
+            : rawKey != null
+              ? String(rawKey)
+              : undefined;
+
+        return { rowKey: typedKey, cells };
+      }),
+      totalCount: data.length,
+    };
+  }
+
+  /**
+   * Static input.table — all data travels inline in the input request.
+   * Resolution is a simple filter against the original data array.
+   */
+  private async handleStaticTableInput(
+    opts: TableInputStaticSingle<any> | TableInputStaticMultiple<any>,
+    selection: "single" | "multiple",
+  ) {
+    const { title, data, rowKey, renderer } = opts;
+    const columns = renderer?.columns ?? opts.columns;
+    const eventName = this.stepName("input");
+
+    const normalizedData = this.normalizeStaticTableData(data, rowKey, columns);
+
+    await this.step!.do(`${eventName}-request`, async () => {
+      await this.sendMessage(
+        createTableInputRequest(eventName, title, {
+          type: "table",
+          label: title,
+          data: normalizedData,
+          rowKey,
+          selection,
+        }),
+      );
+    });
+
+    const event = await this.step!.waitForEvent(eventName, {
+      type: eventName,
+      timeout: "5 minutes",
+    });
+
+    const payload = event.payload as Record<string, unknown>;
+    const selectedKeys = payload.input as RowKeyValue[];
+
+    // Resolve selected keys against the original data array — no loader
+    // round-trip needed since the full dataset was provided inline.
+    const rows = data.filter((row: any) => {
+      const key = row[rowKey];
+      return selectedKeys.some((k) => k === key || String(k) === String(key));
+    });
+
+    if (selection === "single") {
+      return rows[0];
+    }
+    return rows;
+  }
+
+  /**
+   * Loader-backed input.table — browser fetches pages via HTTP, and
+   * selected row keys are resolved server-side through the loader's
+   * `resolve` function.
+   */
+  private async handleLoaderTableInput(
+    opts: TableInputSingle<any> | TableInputMultiple<any>,
+    selection: "single" | "multiple",
+  ) {
+    const { title, source, pageSize, renderer } = opts;
+
+    // rowKey comes from the loader definition, not the call site.
+    const rowKey = source.rowKey;
+    if (!rowKey) {
+      throw new Error(
+        `input.table() requires a loader with rowKey. ` +
+          `Use the config-object form of loader() with rowKey and resolve.`,
+      );
+    }
+
+    const columns = renderer?.columns ?? opts.columns;
+    const serializedColumns = serializeColumns(columns);
+    const eventName = this.stepName("input");
+
+    await this.step!.do(`${eventName}-request`, async () => {
+      await this.storeTableDescriptor({
+        stepId: eventName,
+        loaderName: source.name,
+        params: source.params,
+        tableRendererName: renderer?.name,
+        columns: serializedColumns,
+        pageSize,
+      });
+      await this.sendMessage(
+        createTableInputRequest(eventName, title, {
+          type: "table",
+          label: title,
+          loader: {
+            path: this.buildLoaderPath({
+              runId: this.runId,
+              stepId: eventName,
+            }),
+            pageSize,
+          },
+          rowKey,
+          selection,
+        }),
+      );
+    });
+
+    const event = await this.step!.waitForEvent(eventName, {
+      type: eventName,
+      timeout: "5 minutes",
+    });
+
+    const payload = event.payload as Record<string, unknown>;
+    const rowKeys = payload.input as RowKeyValue[];
+
+    // Look up the loader definition to call its resolve function.
+    const definition = getWorkflow(this.workflowSlug);
+    const loaderDef = definition?.loaders?.[source.name];
+    if (!loaderDef?.resolve) {
+      throw new Error(
+        `Loader "${source.name}" does not have a resolve function.`,
+      );
+    }
+
+    // Resolve row keys to full source rows inside a step for durability.
+    const rows = await this.step!.do(`${eventName}-resolve`, async () => {
+      return loaderDef.resolve!({ keys: rowKeys, ...source.params }, this.env);
+    });
+
+    if (selection === "single") {
+      return rows[0];
+    }
+    return rows;
+  }
+
   private normalizeGroupArgs(
     titleOrFields: string | InputFieldBuilders,
     fieldsOrOptions?: InputFieldBuilders | InputOptions,
@@ -522,88 +717,30 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
       );
     },
     {
-      table: (async (opts: TableInputSingle<any> | TableInputMultiple<any>) => {
+      table: (async (
+        opts:
+          | TableInputSingle<any>
+          | TableInputMultiple<any>
+          | TableInputStaticSingle<any>
+          | TableInputStaticMultiple<any>,
+      ) => {
         if (!this.step) {
           throw new Error("Relay not initialized. Call initRelay() first.");
         }
 
-        const { title, source, pageSize, renderer } = opts;
+        const isStatic = "data" in opts;
         const selection = opts.selection ?? "single";
 
-        // rowKey comes from the loader definition, not the call site.
-        const rowKey = source.rowKey;
-        if (!rowKey) {
-          throw new Error(
-            `input.table() requires a loader with rowKey. ` +
-              `Use the config-object form of loader() with rowKey and resolve.`,
-          );
+        if (isStatic) {
+          // ── Static table: all data sent inline in the input request ──
+          return this.handleStaticTableInput(opts, selection);
         }
 
-        // Table renderers own the display shape when provided; otherwise fall
-        // back to inline columns.
-        const columns = renderer?.columns ?? opts.columns;
-        const serializedColumns = serializeColumns(columns);
-        const eventName = this.stepName("input");
-
-        await this.step.do(`${eventName}-request`, async () => {
-          await this.storeTableDescriptor({
-            stepId: eventName,
-            loaderName: source.name,
-            params: source.params,
-            tableRendererName: renderer?.name,
-            columns: serializedColumns,
-            pageSize,
-          });
-          await this.sendMessage(
-            createTableInputRequest(eventName, title, {
-              type: "table",
-              label: title,
-              loader: {
-                path: this.buildLoaderPath({
-                  runId: this.runId,
-                  stepId: eventName,
-                }),
-                pageSize,
-              },
-              rowKey,
-              selection,
-            }),
-          );
-        });
-
-        const event = await this.step.waitForEvent(eventName, {
-          type: eventName,
-          timeout: "5 minutes",
-        });
-
-        // The client sends back the selected row keys as the value of the
-        // synthetic table field. Row keys preserve their original primitive type
-        // (string or number) through the round-trip.
-        const payload = event.payload as Record<string, unknown>;
-        const rowKeys = payload.input as RowKeyValue[];
-
-        // Look up the loader definition to call its resolve function.
-        const definition = getWorkflow(this.workflowSlug);
-        const loaderDef = definition?.loaders?.[source.name];
-        if (!loaderDef?.resolve) {
-          throw new Error(
-            `Loader "${source.name}" does not have a resolve function.`,
-          );
-        }
-
-        // Resolve row keys to full source rows inside a step for durability.
-        const rows = await this.step.do(`${eventName}-resolve`, async () => {
-          return loaderDef.resolve!(
-            { keys: rowKeys, ...source.params },
-            this.env,
-          );
-        });
-
-        // Single selection returns the row directly; multiple returns the array.
-        if (selection === "single") {
-          return rows[0];
-        }
-        return rows;
+        // ── Loader-backed table: browser fetches pages via HTTP ──
+        return this.handleLoaderTableInput(
+          opts as TableInputSingle<any> | TableInputMultiple<any>,
+          selection,
+        );
       }) as RelayInputTableFn,
       text: (label: string, config: TextFieldConfig = {}) =>
         this.createFieldBuilder<
