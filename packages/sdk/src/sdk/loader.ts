@@ -260,7 +260,7 @@ export type TableOutputStatic = {
 /** Loader-backed table — columns are optional, typed against TRow */
 export type TableOutputLoader<TRow = unknown> = {
   title?: string;
-  source: LoaderRef<TRow>;
+  loader: LoaderRef<TRow>;
   pageSize?: number;
   columns?: LoaderColumnDef<TRow>[];
   // Table renderers are the reusable, named version of table display logic.
@@ -271,7 +271,7 @@ export type TableOutputLoader<TRow = unknown> = {
 /** Options for selecting a single row from a loader-backed table. */
 export type TableInputSingle<TRow> = {
   title: string;
-  source: LoaderRef<TRow>;
+  loader: LoaderRef<TRow>;
   pageSize?: number;
   columns?: LoaderColumnDef<TRow>[];
   renderer?: TableRendererDef<TRow>;
@@ -281,7 +281,7 @@ export type TableInputSingle<TRow> = {
 /** Options for selecting multiple rows from a loader-backed table. */
 export type TableInputMultiple<TRow> = {
   title: string;
-  source: LoaderRef<TRow>;
+  loader: LoaderRef<TRow>;
   pageSize?: number;
   columns?: LoaderColumnDef<TRow>[];
   renderer?: TableRendererDef<TRow>;
@@ -310,11 +310,11 @@ export type TableInputStaticMultiple<TRow> = {
   selection: "multiple";
 };
 
-/** Helper to check if output.table was called with a loader source */
+/** Helper to check if output.table was called with a loader ref */
 export function isLoaderTable<TRow = unknown>(
   opts: TableOutputStatic | TableOutputLoader<TRow>,
 ): opts is TableOutputLoader<TRow> {
-  return "source" in opts && opts.source !== undefined;
+  return "loader" in opts && opts.loader !== undefined;
 }
 
 /** Serialize column defs for the NDJSON stream (strips renderCell functions) */

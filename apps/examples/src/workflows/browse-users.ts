@@ -30,7 +30,7 @@ export const browseUsers = createWorkflow({
   handler: async ({ input, output, loaders }) => {
     const user = await input.table({
       title: "Pick a user to view",
-      source: loaders.users,
+      loader: loaders.users,
       renderer: userTableRenderer,
       pageSize: 5,
     });
@@ -49,7 +49,7 @@ export const browseUsers = createWorkflow({
     // // Department-scoped view
     // await output.table({
     //   title: department,
-    //   source:
+    //   loader:
     //     department === "All"
     //       ? loaders.users
     //       : loaders.deptUsers({ department }),
