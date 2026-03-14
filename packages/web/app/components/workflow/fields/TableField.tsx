@@ -1,7 +1,8 @@
 import { useCallback } from "react";
 import type { TableFieldDefinition, RowKeyValue } from "relay-sdk/client";
 import type { FieldProps } from "../SchemaFieldComponents";
-import { PaginatedTable } from "../PaginatedTable";
+import { ServerTable } from "../ServerTable";
+import { StaticTable } from "../StaticTable";
 
 export function TableField({
   fieldName,
@@ -41,13 +42,21 @@ export function TableField({
         )}
       </div>
 
-      <PaginatedTable
-        loader={def.loader}
-        initialData={def.data}
-        selection={def.selection}
-        defaultSelectedKeys={(defaultValue as string[] | undefined) ?? []}
-        onSelectionChange={handleSelectionChange}
-      />
+      {def.loader ? (
+        <ServerTable
+          loader={def.loader}
+          selection={def.selection}
+          defaultSelectedKeys={(defaultValue as string[] | undefined) ?? []}
+          onSelectionChange={handleSelectionChange}
+        />
+      ) : def.data ? (
+        <StaticTable
+          data={def.data}
+          selection={def.selection}
+          defaultSelectedKeys={(defaultValue as string[] | undefined) ?? []}
+          onSelectionChange={handleSelectionChange}
+        />
+      ) : null}
     </div>
   );
 }
