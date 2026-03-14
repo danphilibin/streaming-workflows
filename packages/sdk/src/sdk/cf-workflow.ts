@@ -464,10 +464,10 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
     opts: TableInputSingle<any> | TableInputMultiple<any>,
     selection: "single" | "multiple",
   ) {
-    const { title, source, pageSize, renderer } = opts;
+    const { loader: loaderRef, title, pageSize, renderer } = opts;
 
     // rowKey comes from the loader definition, not the call site.
-    const rowKey = source.rowKey;
+    const rowKey = loaderRef.rowKey;
     if (!rowKey) {
       throw new Error(
         `input.table() requires a loader with rowKey. ` +
@@ -482,8 +482,8 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
     await this.step!.do(`${eventName}-request`, async () => {
       await this.storeTableDescriptor({
         stepId: eventName,
-        loaderName: source.name,
-        params: source.params,
+        loaderName: loaderRef.name,
+        params: loaderRef.params,
         tableRendererName: renderer?.name,
         columns: serializedColumns,
         pageSize,
@@ -515,16 +515,19 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
 
     // Look up the loader definition to call its resolve function.
     const definition = getWorkflow(this.workflowSlug);
-    const loaderDef = definition?.loaders?.[source.name];
+    const loaderDef = definition?.loaders?.[loaderRef.name];
     if (!loaderDef?.resolve) {
       throw new Error(
-        `Loader "${source.name}" does not have a resolve function.`,
+        `Loader "${loaderRef.name}" does not have a resolve function.`,
       );
     }
 
     // Resolve row keys to full source rows inside a step for durability.
     const rows = await this.step!.do(`${eventName}-resolve`, async () => {
-      return loaderDef.resolve!({ keys: rowKeys, ...source.params }, this.env);
+      return loaderDef.resolve!(
+        { keys: rowKeys, ...loaderRef.params },
+        this.env,
+      );
     });
 
     if (selection === "single") {
@@ -626,7 +629,7 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
     },
     table: async <TRow>(opts: TableOutputStatic | TableOutputLoader<TRow>) => {
       if (isLoaderTable(opts)) {
-        const { source, title, pageSize, renderer } = opts;
+        const { loader: loaderRef, title, pageSize, renderer } = opts;
         // Table renderers own the display shape when provided; otherwise we fall back
         // to any inline columns passed directly to output.table().
         const columns = renderer?.columns ?? opts.columns;
@@ -654,8 +657,8 @@ export class RelayWorkflow extends WorkflowEntrypoint<Env, WorkflowParams> {
         await this.step.do(stepId, async () => {
           await this.storeTableDescriptor({
             stepId,
-            loaderName: source.name,
-            params: source.params,
+            loaderName: loaderRef.name,
+            params: loaderRef.params,
             tableRendererName: renderer?.name,
             columns: serializedColumns,
             pageSize,
