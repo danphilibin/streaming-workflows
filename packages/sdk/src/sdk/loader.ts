@@ -53,7 +53,12 @@ export type LoaderColumnDef<TRow> =
 
 /** Reusable table renderer for a row type */
 export type TableRendererDef<TRow = unknown> = {
+  /** Discriminant so TypeScript (and runtime checks) can distinguish renderer
+   * defs from other objects like loader defs or loader refs. */
   __brand: "table_renderer";
+  /** Phantom field — never set to a real value. Exists so TypeScript can tell
+   * apart e.g. `TableRendererDef<User>` from `TableRendererDef<Product>`,
+   * which would otherwise be structurally identical. */
   __row: TRow;
   /** Stable server-side lookup key for reapplying this table renderer on fetches */
   name: string;
@@ -96,14 +101,14 @@ type RowOf<L> = L extends {
 // Re-export so consumers can import from either location.
 export type { RowKeyValue } from "../isomorphic/table";
 
-/** A loader definition — wraps the loader callback plus runtime metadata. */
+/** A loader definition — wraps the loader callback plus runtime metadata.
+ *
+ * `TParams` and `TRow` are encoded in the `fn` and `resolve` signatures,
+ * so utility types like `ParamsOf` and `RowOf` can extract them directly. */
 export type LoaderDef<TParams = any, TRow = any> = {
+  /** Discriminant so TypeScript (and runtime checks) can distinguish loader
+   * defs from other objects like loader refs or renderer defs. */
   __brand: "loader";
-  // These fields do not exist at runtime. They are only here so TypeScript can
-  // remember the row and param types through helpers like createWorkflow().
-  // row/param types through helpers like createWorkflow() and output.table().
-  __params: TParams;
-  __row: TRow;
   fn: (
     params: TParams & PaginationParams,
     env: Env,
@@ -118,9 +123,18 @@ export type LoaderDef<TParams = any, TRow = any> = {
   ) => Promise<TRow[]>;
 };
 
-/** A serializable reference to a loader with bound params */
+/** A serializable reference to a loader with bound params.
+ *
+ * Unlike `LoaderDef`, a ref has no `fn` — it's just a name + params that
+ * the HTTP layer uses to look up the real loader at query time. */
 export type LoaderRef<TRow = unknown> = {
+  /** Discriminant so TypeScript (and runtime checks) can distinguish loader
+   * refs from loader defs or renderer defs. */
   __brand: "loader_ref";
+  /** Phantom field — never set to a real value. Without it every
+   * `LoaderRef<T>` would be structurally identical regardless of `T`,
+   * and TypeScript couldn't catch mismatches like passing a
+   * `LoaderRef<User>` where a `LoaderRef<Product>` is expected. */
   __row: TRow;
   name: string;
   // These params are captured during the workflow run, then persisted into a
