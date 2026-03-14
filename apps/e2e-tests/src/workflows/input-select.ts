@@ -1,23 +1,21 @@
 import { createWorkflow } from "relay-sdk";
 
 /**
- * Tests a schema with a single select field.
+ * Tests a group with a single select builder.
  * Verifies the selected option value is returned as a string.
  */
 export const inputSelect = createWorkflow({
   name: "Input Select",
   handler: async ({ input, output }) => {
-    const result = await input("Pick a color", {
-      color: {
-        type: "select",
-        label: "Favorite color",
+    const result = await input.group("Pick a color", {
+      color: input.select("Favorite color", {
         description: "Choose one",
         options: [
           { value: "red", label: "Red" },
           { value: "green", label: "Green" },
           { value: "blue", label: "Blue" },
         ],
-      },
+      }),
     });
     await output.metadata({
       title: "Result",

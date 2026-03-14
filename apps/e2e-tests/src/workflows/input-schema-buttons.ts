@@ -1,16 +1,16 @@
 import { createWorkflow } from "relay-sdk";
 
 /**
- * Tests `input("prompt", schema, { buttons: [...] })` overload.
+ * Tests `input.group("prompt", fields, { buttons: [...] })`.
  * Verifies the response includes typed schema fields + `$choice`.
  */
 export const inputSchemaButtons = createWorkflow({
   name: "Input Schema Buttons",
   handler: async ({ input, output }) => {
-    const result = await input(
+    const result = await input.group(
       "Review the entry",
       {
-        note: { type: "text", label: "Note", placeholder: "Add a note..." },
+        note: input.text("Note", { placeholder: "Add a note..." }),
       },
       {
         buttons: ["Approve", { label: "Reject", intent: "danger" }],

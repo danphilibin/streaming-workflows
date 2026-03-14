@@ -23,13 +23,13 @@ Runs on separate ports from `pnpm dev` so you can develop and test simultaneousl
 
 | Workflow               | What it tests                                           |
 | ---------------------- | ------------------------------------------------------- |
-| `input-text`           | Simple `input(prompt)` — returns string                 |
-| `input-number`         | Number field in schema — returns number                 |
-| `input-checkbox`       | Checkbox field in schema — returns boolean              |
-| `input-select`         | Select field with options — returns string              |
-| `input-mixed-schema`   | All four field types in one form, verifies all types    |
-| `input-buttons`        | `input(prompt, { buttons })` — returns value + $choice  |
-| `input-schema-buttons` | `input(prompt, schema, { buttons })` — fields + $choice |
+| `input-text`           | Awaitable `input.text()` builder — returns string       |
+| `input-number`         | `input.group()` with number builder — returns number    |
+| `input-checkbox`       | `input.group()` with checkbox builder — returns boolean |
+| `input-select`         | `input.group()` with select builder — returns string    |
+| `input-mixed-schema`   | All four builder types in one form, verifies all types  |
+| `input-buttons`        | `input.group(..., { buttons })` — value + $choice       |
+| `input-schema-buttons` | `input.group(..., { buttons })` — fields + $choice      |
 
 ### Output primitives
 
@@ -58,6 +58,6 @@ Runs on separate ports from `pnpm dev` so you can develop and test simultaneousl
 
 **Adding a new test workflow:**
 
-1. Create `src/workflows/my-test.ts` using `createWorkflow()`
+1. Create `src/workflows/my-test.ts` using `createWorkflow()` and the builder DSL
 2. Import it in `src/index.ts`
 3. Add a spec in `tests/e2e/` (use `openWorkflow("my-test")` and `getMetadataValue()` from fixtures)

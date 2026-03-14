@@ -13,9 +13,21 @@ async function openWorkflow(
 
 export const test = base.extend<{
   openWorkflow: (slug: string) => Promise<void>;
+  continueWorkflow: (label?: string) => Promise<void>;
 }>({
   openWorkflow: async ({ page }, use) => {
     await use((slug: string) => openWorkflow(page, slug));
+  },
+  // Clicks the first enabled button matching the label (default "Continue").
+  // This avoids ambiguity in multi-step workflows where previous steps
+  // leave behind disabled buttons with the same label.
+  continueWorkflow: async ({ page }, use) => {
+    await use(async (label = "Continue") => {
+      const button = page
+        .getByRole("button", { name: new RegExp(label, "i") })
+        .and(page.locator(":not([disabled])"));
+      await button.click();
+    });
   },
 });
 
