@@ -7,7 +7,7 @@
     "dev": "react-router dev",
     "build": "react-router build",
     "typecheck": "react-router typegen && tsc",
-    "deploy": "wrangler pages deploy"
+    "deploy": "pnpm run build && wrangler pages deploy"
   },
   "dependencies": {
     "@cloudflare/kumo": "1.9.0",

@@ -1,14 +1,12 @@
-const runtimeApiUrl =
-  typeof window !== "undefined" ? window.RELAY_WORKER_URL : undefined;
-
-const configuredApiUrl =
-  runtimeApiUrl?.trim() || import.meta.env.VITE_RELAY_WORKER_URL?.trim() || "";
-
-const normalizedApiBase = configuredApiUrl.replace(/\/+$/, "");
+// In dev, falls back to empty string so requests use relative paths (handled by Vite proxy).
+// In production, VITE_RELAY_WORKER_URL is set in .env.production and baked into the build.
+const configuredApiUrl = (import.meta.env.VITE_RELAY_WORKER_URL ?? "")
+  .trim()
+  .replace(/\/+$/, "");
 
 export function apiPath(path: string): string {
   const normalizedPath = path.replace(/^\/+/, "");
-  return normalizedApiBase
-    ? `${normalizedApiBase}/${normalizedPath}`
+  return configuredApiUrl
+    ? `${configuredApiUrl}/${normalizedPath}`
     : `/${normalizedPath}`;
 }

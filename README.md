@@ -25,33 +25,28 @@ Relay consists of two apps: a static frontend UI deployed to [Cloudflare Pages](
 ### 1. Deploy the worker
 
 ```bash
-pnpm --filter relay-examples deploy
+pnpm --filter relay-examples run deploy
 ```
 
 On first deploy, Wrangler will create a Workers project called `relay-tools`. Note the URL it prints (e.g. `https://relay-tools.your-subdomain.workers.dev`).
 
-### 2. Configure the frontend
-
-Create a `.env` file in `packages/web/` with your worker URL:
+### 2. Deploy the frontend
 
 ```bash
-cp packages/web/.env.example packages/web/.env
+pnpm --filter relay-web run deploy
 ```
 
-Edit `packages/web/.env` and replace `YOUR-SUBDOMAIN` with your Cloudflare subdomain:
+On first deploy, Wrangler will create a Pages project called `relay-web`. Note the URL it prints (e.g. `https://relay-web.pages.dev`).
+
+### 3. Configure the frontend
+
+Create `packages/web/.env.production` with your worker URL:
 
 ```
 VITE_RELAY_WORKER_URL=https://relay-tools.your-subdomain.workers.dev
 ```
 
-### 3. Build and deploy the frontend
-
-```bash
-pnpm --filter relay-web build
-pnpm --filter relay-web run deploy
-```
-
-On first deploy, Wrangler will create a Pages project called `relay-web`. Note the URL it prints (e.g. `https://relay-web.pages.dev`).
+Vite loads this file automatically during production builds, so the URL gets baked in when you run `deploy`.
 
 ### 4. Set the app URL on the worker
 
@@ -65,7 +60,7 @@ When prompted, enter your frontend URL (e.g. `https://relay-web.pages.dev`).
 
 ### Deploy both at once
 
-Once you've deployed each app at least once and configured `packages/web/.env`, you can redeploy everything with:
+Once you've deployed each app at least once and configured the Pages environment variable, you can redeploy everything with:
 
 ```bash
 pnpm build && pnpm deploy:all
