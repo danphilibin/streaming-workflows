@@ -4,13 +4,6 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-12-21",
   "compatibility_flags": ["nodejs_compat"],
-  "workflows": [
-    {
-      "name": "relay-workflow-prototype",
-      "binding": "RELAY_WORKFLOW",
-      "class_name": "RelayWorkflow",
-    },
-  ],
   "durable_objects": {
     "bindings": [
       {

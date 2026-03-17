@@ -11,13 +11,6 @@
   "observability": {
     "enabled": true,
   },
-  "workflows": [
-    {
-      "name": "relay-workflow-prototype",
-      "binding": "RELAY_WORKFLOW",
-      "class_name": "RelayWorkflow",
-    },
-  ],
   "durable_objects": {
     "bindings": [
       {
