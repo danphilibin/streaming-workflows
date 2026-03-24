@@ -1,56 +1,25 @@
 import { DurableObject } from "cloudflare:workers";
 import {
-  type InputSchema,
-  type ButtonDef,
-  type InputOptions,
-  type ButtonLabels,
-  type InputFieldDefinition,
-  type InputFieldBuilder,
-  type InputFieldBuilders,
-  type TextFieldConfig,
-  type NumberFieldConfig,
-  type CheckboxFieldConfig,
-  type SelectFieldConfig,
-  compileInputFields,
-} from "../isomorphic/input";
-import {
   createInputRequest,
-  createTableInputRequest,
-  createLoadingMessage,
-  createOutputMessage,
-  createConfirmRequest,
   createWorkflowComplete,
   type StreamMessage,
 } from "../isomorphic/messages";
-import type { OutputBlock } from "../isomorphic/output";
-import {
-  type RowKeyValue,
-  type LoaderTableData,
-  normalizeCellValue,
-} from "../isomorphic/table";
 import { getWorkflow } from "./registry";
-import type {
-  RelayInputFn,
-  RelayInputTableFn,
-  RelayOutput,
-  RelayLoadingFn,
-  RelayConfirmFn,
-  RelayContext,
-} from "./cf-workflow";
+import type { RelayContext } from "./cf-workflow";
+import type { LoaderDef, LoaderRef } from "./loader";
 import {
-  type LoaderDef,
-  type LoaderRef,
-  type ColumnDef,
-  type SerializedColumnDef,
-  type TableInputSingle,
-  type TableInputMultiple,
-  type TableInputStaticSingle,
-  type TableInputStaticMultiple,
-  type TableOutputStatic,
-  type TableOutputLoader,
-  isLoaderTable,
-  serializeColumns,
-} from "./loader";
+  type ExecutorStep,
+  type EventNamePrefixes,
+  type TableDescriptor,
+  type ContextBuilderDeps,
+  buildInput,
+  buildOutput,
+  buildLoading,
+  buildConfirm,
+} from "./context-builders";
+
+// Re-export types that other modules import from here
+export { type ExecutorStep, type TableDescriptor } from "./context-builders";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -81,18 +50,6 @@ export function getExecutorStub(env: Env, runId: string): DurableObjectStub {
 // ── Internal types ───────────────────────────────────────────────────
 
 /**
- * Minimal step interface for the executor. Handlers use step.do() and
- * step.sleep(); waitForEvent is internal to the SDK's input/confirm wrappers.
- */
-export type ExecutorStep = {
-  do: <T>(name: string, callback: () => Promise<T>) => Promise<T>;
-  sleep: (name: string, duration: string | number) => Promise<void>;
-  waitForEvent: (name: string, opts?: unknown) => Promise<{ payload: unknown }>;
-};
-
-type EventNamePrefixes = "input" | "output" | "loading" | "confirm";
-
-/**
  * Thrown to unwind the handler call stack when the workflow needs to
  * wait for an external event (user input, confirmation, etc.).
  * On the next event arrival the handler replays from the top — cached
@@ -113,19 +70,6 @@ export type ExecutionResult = {
   status: "suspended" | "complete";
   pendingEvent?: string;
   messages: StreamMessage[];
-};
-
-/**
- * Table descriptor — stored in DO storage so that later table query
- * requests can re-run the loader without encoding all state into the URL.
- */
-type TableDescriptor = {
-  workflowSlug: string;
-  loaderName: string;
-  params: Record<string, unknown>;
-  tableRendererName?: string;
-  columns?: SerializedColumnDef[];
-  pageSize?: number;
 };
 
 // ── Loader refs ─────────────────────────────────────────────────────
@@ -420,6 +364,15 @@ export class RelayExecutor extends DurableObject<Env> {
 
     const step = this.createStep();
 
+    // Deps bridge: gives context builders access to DO capabilities
+    // without coupling them to the DurableObject class.
+    const deps: ContextBuilderDeps = {
+      stepName: (prefix) => this.stepName(prefix),
+      appendMessage: (msg) => this.appendMessage(msg),
+      storage: this.ctx.storage,
+      env: this.env,
+    };
+
     // ── Run the handler ────────────────────────────────────────────
     try {
       // ── Upfront input (schema defined on createWorkflow) ───────────
@@ -446,10 +399,10 @@ export class RelayExecutor extends DurableObject<Env> {
 
       await definition.handler({
         step,
-        input: this.buildInput(step, slug, runId),
-        output: this.buildOutput(step, slug, runId),
-        loading: this.buildLoading(step),
-        confirm: this.buildConfirm(step),
+        input: buildInput(deps, step, slug, runId),
+        output: buildOutput(deps, step, slug, runId),
+        loading: buildLoading(deps, step),
+        confirm: buildConfirm(deps, step),
         loaders: loaderRefs,
         ...(data !== undefined && { data }),
       } as RelayContext);
@@ -552,518 +505,5 @@ export class RelayExecutor extends DurableObject<Env> {
 
   private stepName(prefix: EventNamePrefixes): string {
     return `relay-${prefix}-${this.counter++}`;
-  }
-
-  // ── Table helpers ────────────────────────────────────────────────
-
-  // Build the browser-facing table query path. The browser only needs a stable
-  // table resource identifier; the DO holds the loader/display descriptor.
-  private buildLoaderPath(runId: string, stepId: string): string {
-    return `workflows/${runId}/table/${stepId}/query`;
-  }
-
-  private async storeTableDescriptor(
-    stepId: string,
-    descriptor: TableDescriptor,
-  ): Promise<void> {
-    // Table descriptors are small durable records that let later table queries
-    // re-run the loader without encoding display/source state into the URL.
-    await this.ctx.storage.put(`table:${stepId}`, descriptor);
-  }
-
-  /**
-   * Normalize an array of source rows into the display-oriented LoaderTableData
-   * shape. Used by static input.table — the same shape the loader HTTP endpoint
-   * returns, so the client renders both modes identically.
-   */
-  private normalizeStaticTableData<TRow>(
-    data: TRow[],
-    rowKey: string,
-    columns?: ColumnDef<TRow>[],
-  ): LoaderTableData {
-    // Derive columns from the first row when none are specified.
-    const normalizedColumns = columns
-      ? columns.map((col, index) => {
-          if (typeof col === "string") return { key: col, label: col };
-          if ("accessorKey" in col)
-            return { key: col.accessorKey, label: col.label };
-          return { key: `render_${index}`, label: col.label };
-        })
-      : data[0]
-        ? Object.keys(data[0] as Record<string, unknown>).map((key) => ({
-            key,
-            label: key,
-          }))
-        : [];
-
-    return {
-      columns: normalizedColumns,
-      rows: data.map((row: any) => {
-        const cells = Object.fromEntries(
-          normalizedColumns.map((col, index) => {
-            const srcCol = columns?.[index];
-            let value: unknown;
-            if (
-              srcCol &&
-              typeof srcCol !== "string" &&
-              "renderCell" in srcCol
-            ) {
-              value = srcCol.renderCell(row);
-            } else {
-              value = row[col.key];
-            }
-            return [col.key, normalizeCellValue(value)];
-          }),
-        );
-
-        const rawKey = row[rowKey];
-        const typedKey =
-          typeof rawKey === "string" || typeof rawKey === "number"
-            ? rawKey
-            : rawKey != null
-              ? String(rawKey)
-              : undefined;
-
-        return { rowKey: typedKey, cells };
-      }),
-      totalCount: data.length,
-    };
-  }
-
-  // ── Context builders ─────────────────────────────────────────────
-
-  private buildOutput(
-    step: ExecutorStep,
-    workflowSlug: string,
-    runId: string,
-  ): RelayOutput {
-    const sendOutput = async (block: OutputBlock): Promise<void> => {
-      const eventName = this.stepName("output");
-      await step.do(eventName, async () => {
-        await this.appendMessage(createOutputMessage(eventName, block));
-      });
-    };
-
-    return {
-      markdown: async (content) =>
-        sendOutput({ type: "output.markdown", content }),
-      table: async <TRow>(
-        opts: TableOutputStatic | TableOutputLoader<TRow>,
-      ) => {
-        if (isLoaderTable(opts)) {
-          const { loader: loaderRef, title, pageSize, renderer } = opts;
-          // Table renderers own the display shape when provided; otherwise we fall back
-          // to any inline columns passed directly to output.table().
-          const columns = renderer?.columns ?? opts.columns;
-          const serializedColumns = serializeColumns(columns);
-          const stepId = this.stepName("output");
-
-          const block: OutputBlock = {
-            type: "output.table_loader" as const,
-            title,
-            loader: {
-              // The browser only gets a stable query endpoint. The DO stores the
-              // descriptor needed to resolve and render this table later on.
-              path: this.buildLoaderPath(runId, stepId),
-              pageSize,
-            },
-          };
-
-          await step.do(stepId, async () => {
-            await this.storeTableDescriptor(stepId, {
-              workflowSlug,
-              loaderName: loaderRef.name,
-              params: loaderRef.params,
-              tableRendererName: renderer?.name,
-              columns: serializedColumns,
-              pageSize,
-            });
-            await this.appendMessage(createOutputMessage(stepId, block));
-          });
-        } else {
-          await sendOutput({
-            type: "output.table",
-            title: opts.title,
-            data: opts.data,
-            pageSize: opts.pageSize,
-          });
-        }
-      },
-      code: async ({ code, language }) =>
-        sendOutput({ type: "output.code", code, language }),
-      image: async ({ src, alt }) =>
-        sendOutput({ type: "output.image", src, alt }),
-      link: async ({ url, title, description }) =>
-        sendOutput({ type: "output.link", url, title, description }),
-      buttons: async (buttons) =>
-        sendOutput({ type: "output.buttons", buttons }),
-      metadata: async ({ title, data }) =>
-        sendOutput({ type: "output.metadata", title, data }),
-    };
-  }
-
-  // ── Input ────────────────────────────────────────────────────────
-
-  private async requestSchemaInput<TPayload>(
-    step: ExecutorStep,
-    prompt: string,
-    schema: InputSchema | undefined,
-    buttons?: ButtonDef[],
-    mapPayload?: (payload: Record<string, unknown>) => TPayload,
-  ): Promise<TPayload> {
-    const eventName = this.stepName("input");
-
-    await step.do(`${eventName}-request`, async () => {
-      await this.appendMessage(
-        createInputRequest(eventName, prompt, schema, buttons),
-      );
-    });
-
-    const event = await step.waitForEvent(eventName);
-    const payload = event.payload as Record<string, unknown>;
-    return mapPayload ? mapPayload(payload) : (payload as TPayload);
-  }
-
-  private createFieldBuilder<TValue, TDef extends InputFieldDefinition>(
-    step: ExecutorStep,
-    prompt: string,
-    definition: TDef,
-  ): InputFieldBuilder<TValue, TDef> {
-    const execute = () =>
-      this.requestSchemaInput(
-        step,
-        prompt,
-        { input: definition },
-        undefined,
-        (payload) => payload.input as TValue,
-      );
-
-    return {
-      __relayFieldBuilder: true,
-      definition,
-      // oxlint-disable-next-line unicorn/no-thenable -- builders are intentionally awaitable
-      then: (onfulfilled, onrejected) =>
-        execute().then(onfulfilled, onrejected),
-    };
-  }
-
-  private normalizeGroupArgs(
-    titleOrFields: string | InputFieldBuilders,
-    fieldsOrOptions?: InputFieldBuilders | InputOptions,
-    maybeOptions?: InputOptions,
-  ): {
-    title: string;
-    fields: InputFieldBuilders;
-    options: InputOptions | undefined;
-  } {
-    if (typeof titleOrFields === "string") {
-      return {
-        title: titleOrFields,
-        fields: fieldsOrOptions as InputFieldBuilders,
-        options: maybeOptions,
-      };
-    }
-
-    return {
-      title: "",
-      fields: titleOrFields,
-      options: fieldsOrOptions as InputOptions | undefined,
-    };
-  }
-
-  /**
-   * Static input.table — all data travels inline in the input request.
-   * Resolution is a simple filter against the original data array.
-   */
-  private async handleStaticTableInput(
-    step: ExecutorStep,
-    opts: TableInputStaticSingle<any> | TableInputStaticMultiple<any>,
-    selection: "single" | "multiple",
-  ) {
-    const { title, data, rowKey, pageSize, renderer } = opts;
-    const columns = renderer?.columns ?? opts.columns;
-    const eventName = this.stepName("input");
-
-    const normalizedData = this.normalizeStaticTableData(data, rowKey, columns);
-
-    await step.do(`${eventName}-request`, async () => {
-      await this.appendMessage(
-        createTableInputRequest(eventName, title, {
-          type: "table",
-          label: title,
-          data: normalizedData,
-          pageSize,
-          rowKey,
-          selection,
-        }),
-      );
-    });
-
-    const event = await step.waitForEvent(eventName);
-
-    const payload = event.payload as Record<string, unknown>;
-    const selectedKeys = payload.input as RowKeyValue[];
-
-    // Resolve selected keys against the original data array — no loader
-    // round-trip needed since the full dataset was provided inline.
-    const rows = data.filter((row: any) => {
-      const key = row[rowKey];
-      return selectedKeys.some((k) => k === key || String(k) === String(key));
-    });
-
-    if (selection === "single") {
-      return rows[0];
-    }
-    return rows;
-  }
-
-  /**
-   * Loader-backed input.table — browser fetches pages via HTTP, and
-   * selected row keys are resolved server-side through the loader's
-   * `resolve` function.
-   */
-  private async handleLoaderTableInput(
-    step: ExecutorStep,
-    workflowSlug: string,
-    runId: string,
-    opts: TableInputSingle<any> | TableInputMultiple<any>,
-    selection: "single" | "multiple",
-  ) {
-    const { loader: loaderRef, title, pageSize, renderer } = opts;
-
-    // rowKey comes from the loader definition, not the call site.
-    const rowKey = loaderRef.rowKey;
-    if (!rowKey) {
-      throw new Error(
-        `input.table() requires a loader with rowKey. ` +
-          `Use the config-object form of loader() with rowKey and resolve.`,
-      );
-    }
-
-    const columns = renderer?.columns ?? opts.columns;
-    const serializedColumns = serializeColumns(columns);
-    const eventName = this.stepName("input");
-
-    await step.do(`${eventName}-request`, async () => {
-      await this.storeTableDescriptor(eventName, {
-        workflowSlug,
-        loaderName: loaderRef.name,
-        params: loaderRef.params,
-        tableRendererName: renderer?.name,
-        columns: serializedColumns,
-        pageSize,
-      });
-      await this.appendMessage(
-        createTableInputRequest(eventName, title, {
-          type: "table",
-          label: title,
-          loader: {
-            path: this.buildLoaderPath(runId, eventName),
-            pageSize,
-          },
-          rowKey,
-          selection,
-        }),
-      );
-    });
-
-    const event = await step.waitForEvent(eventName);
-
-    const payload = event.payload as Record<string, unknown>;
-    const rowKeys = payload.input as RowKeyValue[];
-
-    // Look up the loader definition to call its resolve function.
-    const definition = getWorkflow(workflowSlug);
-    const loaderDef = definition?.loaders?.[loaderRef.name];
-    if (!loaderDef?.resolve) {
-      throw new Error(
-        `Loader "${loaderRef.name}" does not have a resolve function.`,
-      );
-    }
-
-    // Resolve row keys to full source rows inside a step for durability.
-    const rows = await step.do(`${eventName}-resolve`, async () => {
-      return loaderDef.resolve!(
-        { keys: rowKeys, ...loaderRef.params },
-        this.env,
-      );
-    });
-
-    if (selection === "single") {
-      return rows[0];
-    }
-    return rows;
-  }
-
-  private buildInput(
-    step: ExecutorStep,
-    workflowSlug: string,
-    runId: string,
-  ): RelayInputFn {
-    return Object.assign(
-      async <const B extends readonly ButtonDef[]>(
-        prompt: string,
-        options?: InputOptions<B>,
-      ) => {
-        const buttons = options?.buttons as ButtonDef[] | undefined;
-
-        if (!buttons) {
-          return this.requestSchemaInput(
-            step,
-            prompt,
-            undefined,
-            undefined,
-            (payload) => payload.input as string,
-          );
-        }
-
-        return this.requestSchemaInput(
-          step,
-          prompt,
-          undefined,
-          buttons,
-          (payload) =>
-            ({
-              value: payload.input,
-              $choice: payload.$choice,
-            }) as { value: string; $choice: ButtonLabels<B> },
-        );
-      },
-      {
-        table: (async (
-          opts:
-            | TableInputSingle<any>
-            | TableInputMultiple<any>
-            | TableInputStaticSingle<any>
-            | TableInputStaticMultiple<any>,
-        ) => {
-          const isStatic = "data" in opts;
-          const selection = opts.selection ?? "single";
-
-          if (isStatic) {
-            return this.handleStaticTableInput(step, opts, selection);
-          }
-
-          return this.handleLoaderTableInput(
-            step,
-            workflowSlug,
-            runId,
-            opts as TableInputSingle<any> | TableInputMultiple<any>,
-            selection,
-          );
-        }) as RelayInputTableFn,
-
-        text: (label: string, config: TextFieldConfig = {}) =>
-          this.createFieldBuilder<
-            string,
-            Extract<InputFieldDefinition, { type: "text" }>
-          >(step, label, { type: "text", label, ...config }),
-
-        checkbox: (label: string, config: CheckboxFieldConfig = {}) =>
-          this.createFieldBuilder<
-            boolean,
-            Extract<InputFieldDefinition, { type: "checkbox" }>
-          >(step, label, {
-            type: "checkbox",
-            label,
-            ...config,
-          }),
-
-        number: (label: string, config: NumberFieldConfig = {}) =>
-          this.createFieldBuilder<
-            number,
-            Extract<InputFieldDefinition, { type: "number" }>
-          >(step, label, { type: "number", label, ...config }),
-
-        select: <
-          const TOptions extends readonly { value: string; label: string }[],
-        >(
-          label: string,
-          config: Omit<
-            SelectFieldConfig<TOptions[number]["value"]>,
-            "options"
-          > & {
-            options: TOptions;
-          },
-        ) =>
-          this.createFieldBuilder<
-            TOptions[number]["value"],
-            Extract<InputFieldDefinition, { type: "select" }>
-          >(step, label, {
-            type: "select",
-            label,
-            ...config,
-            options: [...config.options],
-          }),
-
-        group: async (
-          titleOrFields: string | InputFieldBuilders,
-          fieldsOrOptions?: InputFieldBuilders | InputOptions,
-          maybeOptions?: InputOptions,
-        ) => {
-          const { title, fields, options } = this.normalizeGroupArgs(
-            titleOrFields,
-            fieldsOrOptions,
-            maybeOptions,
-          );
-          const schema = compileInputFields(fields);
-          return options
-            ? this.requestSchemaInput(
-                step,
-                title,
-                schema,
-                options.buttons as ButtonDef[],
-              )
-            : this.requestSchemaInput(step, title, schema);
-        },
-      },
-    ) as RelayInputFn;
-  }
-
-  // ── Loading ──────────────────────────────────────────────────────
-
-  private buildLoading(step: ExecutorStep): RelayLoadingFn {
-    return async (message, callback) => {
-      const eventName = this.stepName("loading");
-      const startEventName = `${eventName}-start`;
-      const completeEventName = `${eventName}-complete`;
-
-      await step.do(startEventName, async () => {
-        await this.appendMessage(
-          createLoadingMessage(eventName, message, false),
-        );
-      });
-
-      let completeMessage = message;
-
-      // TODO: currently this runs unconditionally on every loading step;
-      // should we also wrap this in a step.do?
-      await callback({
-        complete: (msg: string) => {
-          completeMessage = msg;
-        },
-      });
-
-      await step.do(completeEventName, async () => {
-        await this.appendMessage(
-          createLoadingMessage(eventName, completeMessage, true),
-        );
-      });
-    };
-  }
-
-  // ── Confirm ──────────────────────────────────────────────────────
-
-  private buildConfirm(step: ExecutorStep): RelayConfirmFn {
-    return async (message: string): Promise<boolean> => {
-      const eventName = this.stepName("confirm");
-
-      await step.do(`${eventName}-request`, async () => {
-        await this.appendMessage(createConfirmRequest(eventName, message));
-      });
-
-      const event = await step.waitForEvent(eventName);
-      return (event.payload as { approved: boolean }).approved;
-    };
   }
 }

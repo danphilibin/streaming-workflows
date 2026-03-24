@@ -12,7 +12,7 @@ import {
   type InferBuilderGroupResult,
 } from "../isomorphic/input";
 import type { OutputButtonDef } from "../isomorphic/output";
-import type { ExecutorStep } from "./cf-executor";
+import type { ExecutorStep } from "./context-builders";
 import { registerWorkflow } from "./registry";
 import type {
   LoaderDef,
