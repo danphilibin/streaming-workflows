@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "@tanstack/react-router";
 import {
   type StreamMessage,
   type WorkflowStatus,
@@ -63,7 +63,11 @@ export function useWorkflowStream({
           const data = (await response.json()) as StartWorkflowParams;
           activeRunId = data.id;
           setCurrentRunId(activeRunId);
-          navigate(`/${workflowName}/${activeRunId}`, { replace: true });
+          navigate({
+            to: "/$workflowName/$runId",
+            params: { workflowName, runId: activeRunId },
+            replace: true,
+          });
         }
 
         if (!activeRunId) {
@@ -201,7 +205,10 @@ export function useWorkflowStream({
   }
 
   function startNewRun() {
-    navigate(`/${workflowName}`);
+    navigate({
+      to: "/$workflowName",
+      params: { workflowName },
+    });
   }
 
   return {

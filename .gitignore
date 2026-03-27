@@ -4,7 +4,9 @@
 node_modules
 worker-configuration.d.ts
 build
+dist
 .react-router
+routeTree.gen.ts
 *.tsbuildinfo
 .mcp.json
 settings.local.json

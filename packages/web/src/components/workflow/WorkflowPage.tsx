@@ -1,22 +1,17 @@
 import { useEffect, useRef } from "react";
-import { useParams } from "react-router";
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { GithubLogo } from "@phosphor-icons/react";
-import type { Route } from "./+types/workflow";
-import { useWorkflowStream } from "../hooks/useWorkflowStream";
-import { MessageList } from "../components/workflow/MessageList";
-import { LoadingMessage } from "../components/workflow/LoadingMessage";
-import { DevConsole } from "../components/workflow/DevConsole";
+import { useWorkflowStream } from "../../hooks/useWorkflowStream";
+import { MessageList } from "./MessageList";
+import { LoadingMessage } from "./LoadingMessage";
+import { DevConsole } from "./DevConsole";
 
-export function meta({ params }: Route.MetaArgs) {
-  return [
-    { title: `${params.workflowName} - Workflow` },
-    { name: "description", content: "Workflow Stream" },
-  ];
+interface WorkflowPageProps {
+  workflowName: string;
+  runId?: string;
 }
 
-export default function Workflow() {
-  const { workflowName, runId } = useParams();
+export function WorkflowPage({ workflowName, runId }: WorkflowPageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -27,7 +22,7 @@ export default function Workflow() {
     submitConfirm,
     startNewRun,
   } = useWorkflowStream({
-    workflowName: workflowName!,
+    workflowName,
     runId,
   });
 

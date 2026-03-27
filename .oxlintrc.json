@@ -1,7 +1,7 @@
 {
   "overrides": [
     {
-      "files": ["packages/web/app/**/*.ts", "packages/web/app/**/*.tsx"],
+      "files": ["packages/web/src/**/*.ts", "packages/web/src/**/*.tsx"],
       "rules": {
         "no-restricted-imports": [
           "error",

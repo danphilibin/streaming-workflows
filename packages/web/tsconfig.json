@@ -16,13 +16,7 @@
     "strict": true,
     "skipLibCheck": true,
     "baseUrl": ".",
-    "rootDirs": [".", "./.react-router/types"],
     "types": ["vite/client"]
   },
-  "include": [
-    "app/**/*",
-    "vite.config.ts",
-    "react-router.config.ts",
-    ".react-router/types/**/*"
-  ]
+  "include": ["src/**/*", "vite.config.ts"]
 }

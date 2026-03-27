@@ -3,7 +3,7 @@ import { InputRequestMessage } from "./InputRequestMessage";
 import { ConfirmRequestMessage } from "./ConfirmRequestMessage";
 import { LoadingMessage } from "./LoadingMessage";
 import { OutputMessage } from "./OutputMessage";
-import { ConnectionState } from "../../routes/workflow";
+import { ConnectionState } from "./WorkflowPage";
 import { useDelayedWaitingIndicator } from "../../hooks/useDelayedWaitingIndicator";
 
 interface MessageListProps {
