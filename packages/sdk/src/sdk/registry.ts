@@ -8,6 +8,8 @@ export type WorkflowDefinition = {
   description?: string;
   handler: RelayHandler;
   input?: InputSchema;
+  /** Whether this workflow is exposed as an MCP tool (default: false). */
+  mcp?: boolean;
   loaders?: Record<
     string,
     {
@@ -49,6 +51,7 @@ export function registerWorkflow(
       resolve?: LoaderDef["resolve"];
     }
   >,
+  mcp?: boolean,
 ): void {
   const slug = slugify(title);
   workflows.set(slug, {
@@ -57,6 +60,7 @@ export function registerWorkflow(
     description,
     handler,
     input,
+    mcp,
     loaders,
   });
 }
@@ -82,18 +86,26 @@ export function getTableRenderer(
   return tableRenderers.get(name);
 }
 
-export function getWorkflowList(): {
+export function getWorkflowList(opts?: { mcp?: boolean }): {
   slug: string;
   title: string;
   description?: string;
   input?: InputSchema;
+  mcp?: boolean;
 }[] {
-  return Array.from(workflows.values())
-    .map(({ slug, title, description, input }) => ({
+  let list = Array.from(workflows.values());
+
+  if (opts?.mcp !== undefined) {
+    list = list.filter((w) => w.mcp === opts.mcp);
+  }
+
+  return list
+    .map(({ slug, title, description, input, mcp }) => ({
       slug,
       title,
       description,
       input,
+      mcp,
     }))
     .sort((a, b) => a.title.localeCompare(b.title));
 }

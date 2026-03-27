@@ -18,7 +18,7 @@ export class RelayMcpAgent extends McpAgent<Env> {
 
   async init() {
     await registerRelayTools(this.server, {
-      listWorkflows: () => getWorkflowList(),
+      listWorkflows: () => getWorkflowList({ mcp: true }),
       startWorkflow: (slug, data) => startWorkflowRun(this.env, slug, data),
       respondToWorkflow: (runId, event, data) =>
         respondToWorkflowRun(this.env, runId, event, data),

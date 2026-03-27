@@ -4,6 +4,7 @@ export const createWebhook = createWorkflow({
   name: "Create Webhook",
   description:
     "Configure a webhook endpoint with event subscriptions and test it.",
+  mcp: true,
   handler: async ({ input, output }) => {
     const { url, contentType } = await input.group("Configure your webhook", {
       url: input.text("Endpoint URL", {

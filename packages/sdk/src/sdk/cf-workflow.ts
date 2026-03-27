@@ -123,6 +123,8 @@ export function createWorkflow<
 >(config: {
   name: string;
   description?: string;
+  /** Expose this workflow as an MCP tool (default: false). */
+  mcp?: boolean;
   input: T;
   loaders?: L;
   handler: (
@@ -137,12 +139,15 @@ export function createWorkflow<
 >(config: {
   name: string;
   description?: string;
+  /** Expose this workflow as an MCP tool (default: false). */
+  mcp?: boolean;
   loaders?: L;
   handler: (ctx: RelayContext & { loaders: LoaderRefs<L> }) => Promise<void>;
 }): void;
 export function createWorkflow(config: {
   name: string;
   description?: string;
+  mcp?: boolean;
   input?: InputFieldBuilders;
   loaders?: Record<string, LoaderDef>;
   handler: (...args: any[]) => Promise<void>;
@@ -168,5 +173,6 @@ export function createWorkflow(config: {
     config.input ? compileInputFields(config.input) : undefined,
     config.description,
     loaders,
+    config.mcp,
   );
 }

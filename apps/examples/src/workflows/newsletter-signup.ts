@@ -3,6 +3,7 @@ import { createWorkflow, field } from "relay-sdk";
 export const newsletterSignup = createWorkflow({
   name: "Newsletter Signup",
   description: "Subscribe a user to the newsletter.",
+  mcp: true,
   input: {
     name: field.text("Your name"),
     email: field.text("Email address"),

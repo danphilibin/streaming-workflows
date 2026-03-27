@@ -22,8 +22,10 @@ function createApiClient(apiUrl: string): RelayMcpBackend {
   return {
     async listWorkflows(): Promise<WorkflowInfo[]> {
       const res = await fetch(`${apiUrl}/workflows`);
-      const data = (await res.json()) as { workflows: WorkflowInfo[] };
-      return data.workflows;
+      const data = (await res.json()) as {
+        workflows: (WorkflowInfo & { mcp?: boolean })[];
+      };
+      return data.workflows.filter((w) => w.mcp === true);
     },
 
     async startWorkflow(
