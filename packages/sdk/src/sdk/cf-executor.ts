@@ -300,13 +300,23 @@ export class RelayExecutor extends DurableObject<Env> {
     await this.ctx.storage.put("messages", messages);
 
     const encoded = new TextEncoder().encode(JSON.stringify(message) + "\n");
+    const isComplete = message.type === "workflow_complete";
 
     for (const controller of this.controllers) {
       try {
         controller.enqueue(encoded);
+        // Close the stream after sending the completion message so the
+        // browser sees a clean end-of-stream rather than a dropped connection.
+        if (isComplete) {
+          controller.close();
+        }
       } catch {
         // Controller may already be closed — ignore
       }
+    }
+
+    if (isComplete) {
+      this.controllers = [];
     }
   }
 
