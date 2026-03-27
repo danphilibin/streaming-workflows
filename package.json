@@ -35,7 +35,8 @@
     "concurrently": "^9.2.1",
     "lefthook": "^2.1.1",
     "oxfmt": "^0.35.0",
-    "oxlint": "^1.50.0"
+    "oxlint": "^1.50.0",
+    "tsx": "^4.21.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
