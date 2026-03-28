@@ -5,14 +5,29 @@ import {
   createRootRoute,
   Link,
   Outlet,
+  redirect,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { getAuth, getSignInUrl } from "@workos/authkit-tanstack-react-start";
+import { AuthKitProvider } from "@workos/authkit-tanstack-react-start/client";
+import { useAuth } from "@workos/authkit-tanstack-react-start/client";
+import { SignOut } from "@phosphor-icons/react";
 import type { WorkflowMeta } from "relay-sdk/client";
 import { apiFetch } from "../lib/api";
+import { isAuthEnabled } from "../lib/auth";
 import "../app.css";
 
 export const Route = createRootRoute({
+  loader: async () => {
+    if (!isAuthEnabled()) return;
+
+    const { user } = await getAuth();
+    if (!user) {
+      const signInUrl = await getSignInUrl();
+      throw redirect({ href: signInUrl });
+    }
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -38,10 +53,12 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <RootDocument>
-      <div className="flex h-screen bg-kumo-base text-kumo-default font-sans">
-        <Sidebar />
-        <Outlet />
-      </div>
+      <AuthKitProvider>
+        <div className="flex h-screen bg-kumo-base text-kumo-default font-sans">
+          <Sidebar />
+          <Outlet />
+        </div>
+      </AuthKitProvider>
     </RootDocument>
   );
 }
@@ -99,6 +116,38 @@ function Sidebar() {
             <div className="font-medium text-sm">{workflow.title}</div>
           </Link>
         ))}
+      </div>
+      <UserFooter />
+    </div>
+  );
+}
+
+function UserFooter() {
+  const { user, loading, signOut } = useAuth();
+
+  if (loading || !user) return null;
+
+  const displayName =
+    user.firstName && user.lastName
+      ? `${user.firstName} ${user.lastName}`
+      : user.email;
+
+  return (
+    <div className="border-t border-[#222] p-3">
+      <div className="flex items-center justify-between gap-2 px-1">
+        <div className="min-w-0">
+          <div className="text-sm text-white truncate">{displayName}</div>
+          {displayName !== user.email && (
+            <div className="text-xs text-[#666] truncate">{user.email}</div>
+          )}
+        </div>
+        <button
+          onClick={() => signOut()}
+          className="shrink-0 p-1.5 rounded-md text-[#666] hover:text-white hover:bg-[#1a1a1a] transition-colors"
+          title="Sign out"
+        >
+          <SignOut size={16} />
+        </button>
       </div>
     </div>
   );

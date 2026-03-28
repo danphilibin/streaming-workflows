@@ -11,12 +11,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import jwt from "@tsndr/cloudflare-worker-jwt";
+import { getAuth } from "@workos/authkit-tanstack-react-start";
+import { isAuthEnabled } from "./auth";
 
 interface WebEnv {
   RELAY_API_SECRET?: string;
 }
 
 export const getToken = createServerFn({ method: "GET" }).handler(async () => {
+  if (isAuthEnabled()) {
+    const { user } = await getAuth();
+    if (!user) throw new Error("Unauthorized");
+  }
+
   const secret = (env as WebEnv).RELAY_API_SECRET;
   if (!secret) return null;
 

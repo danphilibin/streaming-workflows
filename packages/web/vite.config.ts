@@ -21,7 +21,6 @@ export default defineConfig(({ command }) => {
     ],
     server: {
       proxy: {
-        "/api": workerUrl,
         "/stream": workerUrl,
         "/workflows": workerUrl,
       },
