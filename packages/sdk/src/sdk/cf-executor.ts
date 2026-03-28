@@ -258,14 +258,24 @@ export class RelayExecutor extends DurableObject<Env> {
       start: async (controller) => {
         streamController = controller;
 
-        // TODO: Make "send stored history + attach live subscriber" atomic.
-        // Today there is a race where appendMessage() can persist and
-        // broadcast a new message after we read messages from storage but
-        // before this controller is registered. In that case this subscriber
-        // misses the message entirely: it was not in the stored history we sent and
-        // it was not delivered live. That can leave browser clients with a
-        // gap in the event log and can cause the blocking call-response API
-        // to hang or misread run state because it also consumes this stream.
+        // Known race: there is a gap between the storage read below and the
+        // controllers.push() after the loop. If a concurrent fetch calls
+        // appendMessage() during that gap (possible because getMessages()
+        // yields to the event loop), the new message gets persisted and
+        // broadcast to this.controllers — but this controller isn't
+        // registered yet. The message won't be in the history we already
+        // read either, so this subscriber silently misses it.
+        //
+        // Impact: browser clients see a gap in the event log; the blocking
+        // call-response API (getNextInteraction) can hang waiting for a
+        // message that's already in storage.
+        //
+        // In practice the window is very small and the primary consumer
+        // (workflow-api.ts) opens the stream *before* sending the start
+        // fetch, so the race mainly applies to a second client connecting
+        // to an already-running workflow at exactly the wrong moment.
+        // Relay is designed to be single-client, so we'll note this but
+        // are declining to implement a fix.
         const messages = await this.getMessages();
 
         for (const message of messages) {
