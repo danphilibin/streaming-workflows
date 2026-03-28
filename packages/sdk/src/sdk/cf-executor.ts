@@ -80,7 +80,7 @@ function buildLoaderRefs(
   loaderDefs?: Record<
     string,
     {
-      fn: LoaderDef["fn"];
+      load: LoaderDef["load"];
       paramDescriptor?: LoaderDef["paramDescriptor"];
       rowKey?: LoaderDef["rowKey"];
       resolve?: LoaderDef["resolve"];

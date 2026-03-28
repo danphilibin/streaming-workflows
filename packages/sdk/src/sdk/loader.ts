@@ -88,12 +88,14 @@ type NoParams = {};
 /** Check if NoParams extends P — true only when P is exactly {} */
 type HasParams<P> = [NoParams] extends [P] ? false : true;
 
-type ParamsOf<L> = L extends { fn: (params: infer P, env: Env) => Promise<any> }
+type ParamsOf<L> = L extends {
+  load: (params: infer P, env: Env) => Promise<any>;
+}
   ? Omit<P, keyof PaginationParams>
   : never;
 
 type RowOf<L> = L extends {
-  fn: (...args: any[]) => Promise<LoaderResult<infer R>>;
+  load: (...args: any[]) => Promise<LoaderResult<infer R>>;
 }
   ? R
   : never;
@@ -103,13 +105,13 @@ export type { RowKeyValue } from "../isomorphic/table";
 
 /** A loader definition — wraps the loader callback plus runtime metadata.
  *
- * `TParams` and `TRow` are encoded in the `fn` and `resolve` signatures,
+ * `TParams` and `TRow` are encoded in the `load` and `resolve` signatures,
  * so utility types like `ParamsOf` and `RowOf` can extract them directly. */
 export type LoaderDef<TParams = any, TRow = any> = {
   /** Discriminant so TypeScript (and runtime checks) can distinguish loader
    * defs from other objects like loader refs or renderer defs. */
   __brand: "loader";
-  fn: (
+  load: (
     params: TParams & PaginationParams,
     env: Env,
   ) => Promise<LoaderResult<TRow>>;
@@ -209,7 +211,7 @@ export function loader<TRow, K extends keyof TRow & string>(config: {
 export function loader(...args: any[]): any {
   // Simple function form: loader(fn)
   if (typeof args[0] === "function") {
-    return { __brand: "loader" as const, fn: args[0] };
+    return { __brand: "loader" as const, load: args[0] };
   }
 
   // Config object form: loader({ rowKey, load, resolve, params? })
@@ -217,7 +219,7 @@ export function loader(...args: any[]): any {
     const config = args[0];
     return {
       __brand: "loader" as const,
-      fn: config.load,
+      load: config.load,
       paramDescriptor: config.params,
       rowKey: config.rowKey,
       resolve: config.resolve,
@@ -227,7 +229,7 @@ export function loader(...args: any[]): any {
   // Param descriptor form: loader(descriptor, fn)
   return {
     __brand: "loader" as const,
-    fn: args[1],
+    load: args[1],
     paramDescriptor: args[0],
   };
 }

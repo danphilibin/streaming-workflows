@@ -270,7 +270,7 @@ async function handleRequest(req: Request, env: Env): Promise<Response> {
     const pageSize = body.pageSize ?? descriptor.pageSize ?? 20;
     const query = body.query || undefined;
 
-    const result = await loaderDef.fn(
+    const result = await loaderDef.load(
       { ...descriptor.params, query, page, pageSize },
       env,
     );

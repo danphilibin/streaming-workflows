@@ -13,7 +13,7 @@ export type WorkflowDefinition = {
   loaders?: Record<
     string,
     {
-      fn: LoaderDef["fn"];
+      load: LoaderDef["load"];
       paramDescriptor?: LoaderDef["paramDescriptor"];
       rowKey?: LoaderDef["rowKey"];
       resolve?: LoaderDef["resolve"];
@@ -45,7 +45,7 @@ export function registerWorkflow(opts: {
   loaders?: Record<
     string,
     {
-      fn: LoaderDef["fn"];
+      load: LoaderDef["load"];
       paramDescriptor?: LoaderDef["paramDescriptor"];
       rowKey?: LoaderDef["rowKey"];
       resolve?: LoaderDef["resolve"];

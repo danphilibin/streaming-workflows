@@ -158,7 +158,7 @@ export function createWorkflow(config: {
         Object.entries(config.loaders).map(([name, def]) => [
           name,
           {
-            fn: def.fn,
+            load: def.load,
             paramDescriptor: def.paramDescriptor,
             rowKey: def.rowKey,
             resolve: def.resolve,
