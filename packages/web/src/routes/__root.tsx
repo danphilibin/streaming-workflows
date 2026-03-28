@@ -9,7 +9,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import type { WorkflowMeta } from "relay-sdk/client";
-import { apiPath } from "../lib/api";
+import { apiFetch } from "../lib/api";
 import "../app.css";
 
 export const Route = createRootRoute({
@@ -64,7 +64,7 @@ function Sidebar() {
   const [workflows, setWorkflows] = useState<WorkflowMeta[]>([]);
 
   useEffect(() => {
-    fetch(apiPath("workflows"))
+    apiFetch("workflows")
       .then((res) => res.json() as Promise<{ workflows: WorkflowMeta[] }>)
       .then((data) => setWorkflows(data.workflows))
       .catch((err) => console.error("Failed to load workflows:", err));

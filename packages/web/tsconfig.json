@@ -16,7 +16,7 @@
     "strict": true,
     "skipLibCheck": true,
     "baseUrl": ".",
-    "types": ["vite/client"]
+    "types": ["vite/client", "@cloudflare/workers-types"]
   },
   "include": ["src/**/*", "vite.config.ts"]
 }

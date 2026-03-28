@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LoaderTableData, RowKeyValue } from "relay-sdk/client";
-import { apiPath } from "../../lib/api";
+import { apiFetch } from "../../lib/api";
 import { TableDisplay } from "./TableDisplay";
 import { TableToolbar } from "./TableToolbar";
 
@@ -43,10 +43,8 @@ export function ServerTable({
     async (p: number, q: string) => {
       setLoading(true);
       setError(null);
-      const url = apiPath(loader.path);
-
       try {
-        const res = await fetch(url, {
+        const res = await apiFetch(loader.path, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
