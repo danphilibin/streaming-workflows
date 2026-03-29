@@ -10,6 +10,8 @@ import {
 export type CreateRelayMcpServerOptions = {
   /** Base URL for the Relay API (e.g. "http://localhost:8787") */
   apiUrl: string;
+  /** API key for authenticating with the worker (RELAY_API_KEY). */
+  apiKey?: string;
   /** MCP server name (default: "relay") */
   name?: string;
   /** MCP server version (default: "0.1.0") */
@@ -36,10 +38,19 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-function createApiClient(apiUrl: string): RelayMcpBackend {
+function createApiClient(apiUrl: string, apiKey?: string): RelayMcpBackend {
+  // Build base headers — when apiKey is set, include it as a raw Bearer
+  // token (no JWT minting needed for MCP/CLI, the worker accepts raw keys).
+  const baseHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (apiKey) {
+    baseHeaders["Authorization"] = `Bearer ${apiKey}`;
+  }
+
   return {
     async listWorkflows(): Promise<WorkflowInfo[]> {
-      const res = await fetch(`${apiUrl}/workflows`);
+      const res = await fetch(`${apiUrl}/workflows`, { headers: baseHeaders });
       const data = await jsonOrThrow<{
         workflows: (WorkflowInfo & { mcp?: boolean })[];
       }>(res);
@@ -52,7 +63,7 @@ function createApiClient(apiUrl: string): RelayMcpBackend {
     ): Promise<CallResponseResult> {
       const res = await fetch(`${apiUrl}/api/run`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: baseHeaders,
         body: JSON.stringify({ workflow: slug, data }),
       });
       return jsonOrThrow<CallResponseResult>(res);
@@ -65,7 +76,7 @@ function createApiClient(apiUrl: string): RelayMcpBackend {
     ): Promise<CallResponseResult> {
       const res = await fetch(`${apiUrl}/api/run/${runId}/respond`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: baseHeaders,
         body: JSON.stringify({ event, data }),
       });
       return jsonOrThrow<CallResponseResult>(res);
@@ -80,13 +91,13 @@ function createApiClient(apiUrl: string): RelayMcpBackend {
  * variant, see cf-mcp-agent.ts.
  */
 export function createRelayMcpServer(options: CreateRelayMcpServerOptions) {
-  const { apiUrl, name = "relay", version = "0.1.0" } = options;
+  const { apiUrl, apiKey, name = "relay", version = "0.1.0" } = options;
 
   const server = new McpServer({ name, version });
 
   return {
     async start() {
-      await registerRelayTools(server, createApiClient(apiUrl));
+      await registerRelayTools(server, createApiClient(apiUrl, apiKey));
       const transport = new StdioServerTransport();
       await server.connect(transport);
     },

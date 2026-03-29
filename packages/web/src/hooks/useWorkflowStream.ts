@@ -8,7 +8,7 @@ import {
   type StartWorkflowParams,
   type WorkflowParams,
 } from "relay-sdk/client";
-import { apiPath } from "../lib/api";
+import { apiFetch } from "../lib/api";
 
 interface UseWorkflowStreamOptions {
   workflowName: string;
@@ -54,7 +54,7 @@ export function useWorkflowStream({
 
         // Create new run if no runId
         if (!activeRunId) {
-          const response = await fetch(apiPath("workflows"), {
+          const response = await apiFetch("workflows", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
@@ -101,12 +101,9 @@ export function useWorkflowStream({
 
   async function connectToStream(workflowId: string, signal: AbortSignal) {
     try {
-      const streamResponse = await fetch(
-        apiPath(`workflows/${workflowId}/stream`),
-        {
-          signal,
-        },
-      );
+      const streamResponse = await apiFetch(`workflows/${workflowId}/stream`, {
+        signal,
+      });
       const reader = streamResponse.body?.getReader();
       if (!reader) throw new Error("No reader available");
 
@@ -187,7 +184,7 @@ export function useWorkflowStream({
   ) {
     if (!currentRunId) return;
 
-    await fetch(apiPath(`workflows/${currentRunId}/event/${eventName}`), {
+    await apiFetch(`workflows/${currentRunId}/event/${eventName}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ value }),
@@ -197,7 +194,7 @@ export function useWorkflowStream({
   async function submitConfirm(eventName: string, approved: boolean) {
     if (!currentRunId) return;
 
-    await fetch(apiPath(`workflows/${currentRunId}/event/${eventName}`), {
+    await apiFetch(`workflows/${currentRunId}/event/${eventName}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ approved }),

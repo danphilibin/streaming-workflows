@@ -18,11 +18,12 @@ import {
 } from "./workflow-api";
 import { RelayMcpAgent } from "./cf-mcp-agent";
 import { getExecutorStub } from "./cf-executor";
+import jwt from "@tsndr/cloudflare-worker-jwt";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
 function deriveColumnKey(column: SerializedColumnDef, index: number): string {
@@ -58,12 +59,63 @@ function withCors(response: Response): Response {
   });
 }
 
+/**
+ * Verify the Bearer token from the Authorization header.
+ *
+ * Tokens with dots are treated as JWTs and verified against the signing key.
+ * Tokens without dots are treated as raw API keys (for MCP/CLI) and
+ * compared directly against the API key.
+ *
+ * The signing key and API key are separate credentials so that a leaked
+ * API key cannot be used to forge JWTs (important for the hosted cloud
+ * path where we issue API keys to customers).
+ *
+ * Returns the JWT payload (or a minimal object for raw keys) on success,
+ * or a 401 Response on failure.
+ */
+async function authenticateRequest(
+  req: Request,
+  signingKey: string | undefined,
+  apiKey: string | undefined,
+): Promise<Record<string, unknown> | Response> {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return new Response("Missing or malformed Authorization header", {
+      status: 401,
+    });
+  }
+
+  const token = authHeader.slice(7); // strip "Bearer "
+
+  // Raw API key (no dots) — direct comparison for MCP/CLI clients
+  if (!token.includes(".")) {
+    if (apiKey && token === apiKey) {
+      return { iss: "api-key" };
+    }
+    return new Response("Invalid API key", { status: 401 });
+  }
+
+  // JWT — verify signature and expiry
+  if (!signingKey) {
+    return new Response("JWT auth not configured", { status: 401 });
+  }
+  const result = await jwt
+    .verify(token, signingKey, { throwError: true })
+    .catch(() => null);
+  if (!result) {
+    return new Response("Invalid or expired token", { status: 401 });
+  }
+
+  return result.payload ?? {};
+}
+
 export const httpHandler = async (
   req: Request,
   env: Env,
   ctx: ExecutionContext,
 ) => {
-  // Auto-route /mcp when RELAY_MCP_AGENT binding is present
+  // Auto-route /mcp when RELAY_MCP_AGENT binding is present.
+  // MCP agent uses Cloudflare DO binding (not HTTP auth), so skip auth here.
   if (env.RELAY_MCP_AGENT) {
     const url = new URL(req.url);
     if (url.pathname.startsWith("/mcp")) {
@@ -77,6 +129,21 @@ export const httpHandler = async (
 
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  // ── Auth gate ───────────────────────────────────────────────────
+  // When either auth credential is configured, every request must carry
+  // a valid Bearer token. No credentials → open access (local dev).
+  if (env.RELAY_SIGNING_KEY || env.RELAY_API_KEY) {
+    const result = await authenticateRequest(
+      req,
+      env.RELAY_SIGNING_KEY,
+      env.RELAY_API_KEY,
+    );
+    if (result instanceof Response) {
+      return withCors(result);
+    }
+    // result is the JWT payload — available for future identity claims (R-74)
   }
 
   const response = await handleRequest(req, env);
