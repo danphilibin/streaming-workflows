@@ -62,21 +62,21 @@ function withCors(response: Response): Response {
 /**
  * Verify the Bearer token from the Authorization header.
  *
- * Tokens with dots are treated as JWTs and verified cryptographically.
+ * Tokens with dots are treated as JWTs and verified against the signing key.
  * Tokens without dots are treated as raw API keys (for MCP/CLI) and
- * compared directly against the secret.
+ * compared directly against the API key.
  *
- * Today RELAY_API_SECRET pulls double duty as both the JWT signing key
- * and the raw API key value for trusted non-browser clients. That's fine
- * for the initial self-hosted auth shape, but we may want to split those
- * roles into separate credentials later.
+ * The signing key and API key are separate credentials so that a leaked
+ * API key cannot be used to forge JWTs (important for the hosted cloud
+ * path where we issue API keys to customers).
  *
  * Returns the JWT payload (or a minimal object for raw keys) on success,
  * or a 401 Response on failure.
  */
 async function authenticateRequest(
   req: Request,
-  secret: string,
+  signingKey: string | undefined,
+  apiKey: string | undefined,
 ): Promise<Record<string, unknown> | Response> {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -89,15 +89,18 @@ async function authenticateRequest(
 
   // Raw API key (no dots) — direct comparison for MCP/CLI clients
   if (!token.includes(".")) {
-    if (token === secret) {
+    if (apiKey && token === apiKey) {
       return { iss: "api-key" };
     }
     return new Response("Invalid API key", { status: 401 });
   }
 
   // JWT — verify signature and expiry
+  if (!signingKey) {
+    return new Response("JWT auth not configured", { status: 401 });
+  }
   const result = await jwt
-    .verify(token, secret, { throwError: true })
+    .verify(token, signingKey, { throwError: true })
     .catch(() => null);
   if (!result) {
     return new Response("Invalid or expired token", { status: 401 });
@@ -129,10 +132,14 @@ export const httpHandler = async (
   }
 
   // ── Auth gate ───────────────────────────────────────────────────
-  // When RELAY_API_SECRET is configured, every request must carry a
-  // valid Bearer token. No secret → open access (local dev).
-  if (env.RELAY_API_SECRET) {
-    const result = await authenticateRequest(req, env.RELAY_API_SECRET);
+  // When either auth credential is configured, every request must carry
+  // a valid Bearer token. No credentials → open access (local dev).
+  if (env.RELAY_SIGNING_KEY || env.RELAY_API_KEY) {
+    const result = await authenticateRequest(
+      req,
+      env.RELAY_SIGNING_KEY,
+      env.RELAY_API_KEY,
+    );
     if (result instanceof Response) {
       return withCors(result);
     }

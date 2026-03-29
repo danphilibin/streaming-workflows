@@ -2,5 +2,6 @@
 // set via `wrangler secret put` (not declared in wrangler.jsonc).
 interface Env {
   RELAY_APP_URL: string;
-  RELAY_API_SECRET?: string;
+  RELAY_SIGNING_KEY?: string;
+  RELAY_API_KEY?: string;
 }

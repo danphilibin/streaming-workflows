@@ -9,7 +9,7 @@ import { createRelayMcpServer } from "relay-sdk/mcp";
 
 const server = createRelayMcpServer({
   apiUrl: process.env.RELAY_WORKER_URL || "http://localhost:8787",
-  apiSecret: process.env.RELAY_API_SECRET,
+  apiKey: process.env.RELAY_API_KEY,
 });
 
 server.start().catch(console.error);
