@@ -65,7 +65,8 @@ Internally split into two directories:
 - **`src/sdk/`** — Cloudflare-specific implementation. The key files:
   - `cf-executor.ts` — `RelayExecutor` Durable Object, owns both workflow execution and message streaming per run
   - `cf-workflow.ts` — `createWorkflow()` factory and shared types (`RelayContext`, `RelayOutput`, etc.). Also contains the legacy `RelayWorkflow` class (Workflows entrypoint, no longer used)
-  - `cf-http.ts` — HTTP request handler with all routes
+  - `cf-http.ts` — HTTP request handler with all routes, including the optional auth gate
+  - `env.d.ts` — `Env` type for the worker, including optional `RELAY_SIGNING_KEY` and `RELAY_API_KEY`
   - `cf-mcp-agent.ts` — `RelayMcpAgent`, Cloudflare-native MCP server (Durable Object)
   - `workflow-api.ts` — Core call-response execution functions shared between the HTTP handler and MCP agent
   - `registry.ts` — Global workflow registry (`Map`), populated by `createWorkflow()`
@@ -75,6 +76,8 @@ Internally split into two directories:
 React SPA (React 19, React Router v7, Tailwind v4). Independently deployable. Connects to a Relay worker via a configurable API URL.
 
 The core hook is `useWorkflowStream` — it manages the full lifecycle of connecting to a run's NDJSON stream, parsing messages with Zod, and exposing state to the UI. Message rendering is driven by the `StreamMessage` discriminated union; the UI never needs to know what workflow it's displaying.
+
+The app is deployed as a TanStack Start SSR app on Cloudflare Workers. Server functions handle auth and token minting (see the Authentication section). All browser → worker API calls go through `apiFetch()` in `lib/api.ts`, which handles URL resolution, token caching, and 401 retry.
 
 ### `apps/examples`
 
@@ -96,6 +99,27 @@ Thin MCP server entrypoint that delegates to `relay-sdk/mcp`. Used for running a
 - **The frontend is workflow-agnostic.** The React app renders any workflow purely from the `StreamMessage` stream. There is no per-workflow UI code.
 - **The Durable Object is the source of truth.** All messages are persisted in the executor DO. The stream replays full history on connect, so the client can recover from disconnects or page reloads.
 - **Handlers must be deterministic.** The replay engine uses a counter-based naming scheme (`relay-input-0`, `relay-input-1`, etc.). Handlers must always execute the same steps in the same order.
+- **Auth is opt-in via env vars.** No credentials configured → open access. Either `RELAY_SIGNING_KEY` or `RELAY_API_KEY` present → every HTTP request (except `/mcp`) must carry a valid Bearer token.
+
+## Authentication
+
+Auth is **optional** — when no credentials are configured, everything runs in open-access mode (local dev). When either `RELAY_SIGNING_KEY` or `RELAY_API_KEY` is set on the worker, the HTTP handler requires a valid `Bearer` token on every request (except `/mcp`, which uses DO bindings).
+
+Two token types are supported:
+
+- **JWT** — issued by the web app's server functions, signed with `RELAY_SIGNING_KEY`. Used for browser → worker requests. Short-lived (5 min), auto-refreshed by `apiFetch()`.
+- **Raw API key** — `RELAY_API_KEY`, compared directly. Used by MCP/CLI clients. Cannot forge JWTs (the signing key and API key are separate credentials).
+
+The web app uses **WorkOS AuthKit** for user-facing login. When `WORKOS_CLIENT_ID` is configured, a TanStack Start middleware gates access and `lib/token.ts` mints worker JWTs for authenticated users. When unconfigured, auth is fully disabled. Key files:
+
+- `packages/web/src/env.server.ts` — typed access to Cloudflare secrets, startup validation logging
+- `packages/web/src/lib/auth.ts` — server functions: `getAuthConfig()`, `requireAuth()`
+- `packages/web/src/lib/token.ts` — server function: `getToken()` mints short-lived worker JWTs
+- `packages/web/src/lib/api.ts` — `apiFetch()` wrapper that handles token caching, refresh, and retry on 401
+- `packages/web/src/start.ts` — TanStack Start entry with conditional WorkOS middleware
+- `packages/web/src/routes/api/auth/callback.tsx` — WorkOS OAuth callback route
+
+The stdio MCP server (`createRelayMcpServer`) accepts an optional `apiKey` and attaches it as a raw `Bearer` token on all worker requests.
 
 ## Cross-Cutting Concerns
 
