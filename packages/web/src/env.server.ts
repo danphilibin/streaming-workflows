@@ -16,3 +16,18 @@ type RelayWebEnv = {
 };
 
 export const env = cfEnv as RelayWebEnv;
+
+// ── Startup logging (runs once on first server-side import) ───────
+const authEnabled = !!env.WORKOS_CLIENT_ID;
+
+console.log(
+  authEnabled
+    ? "[relay-web] Auth: WorkOS"
+    : "[relay-web] Auth: disabled (open access)",
+);
+
+if (authEnabled && !env.RELAY_SIGNING_KEY) {
+  console.warn(
+    "[relay-web] WorkOS is configured but RELAY_SIGNING_KEY is not set — browser→worker requests will be unauthenticated",
+  );
+}

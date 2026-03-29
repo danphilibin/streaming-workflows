@@ -6,13 +6,12 @@
  * In local dev with no signing key configured, returns null (auth is skipped).
  */
 import { createServerFn } from "@tanstack/react-start";
-import jwt from "@tsndr/cloudflare-worker-jwt";
-import { getAuth } from "@workos/authkit-tanstack-react-start";
-import { env } from "../env";
-import { isAuthEnabled } from "./auth";
 
 export const getToken = createServerFn({ method: "GET" }).handler(async () => {
-  if (isAuthEnabled()) {
+  const { env } = await import("../env.server");
+
+  if (env.WORKOS_CLIENT_ID) {
+    const { getAuth } = await import("@workos/authkit-tanstack-react-start");
     const { user } = await getAuth();
     if (!user) throw new Error("Unauthorized");
   }
@@ -20,6 +19,7 @@ export const getToken = createServerFn({ method: "GET" }).handler(async () => {
   const signingKey = env.RELAY_SIGNING_KEY;
   if (!signingKey) return null;
 
+  const jwt = (await import("@tsndr/cloudflare-worker-jwt")).default;
   return await jwt.sign(
     {
       iss: "relay-web",

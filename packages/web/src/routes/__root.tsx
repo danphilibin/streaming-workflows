@@ -5,28 +5,26 @@ import {
   createRootRoute,
   Link,
   Outlet,
-  redirect,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { getAuth, getSignInUrl } from "@workos/authkit-tanstack-react-start";
-import { AuthKitProvider } from "@workos/authkit-tanstack-react-start/client";
-import { useAuth } from "@workos/authkit-tanstack-react-start/client";
+import {
+  AuthKitProvider,
+  useAuth,
+} from "@workos/authkit-tanstack-react-start/client";
 import { SignOut } from "@phosphor-icons/react";
 import type { WorkflowMeta } from "relay-sdk/client";
 import { apiFetch } from "../lib/api";
-import { isAuthEnabled } from "../lib/auth";
+import { getAuthConfig, requireAuth } from "../lib/auth";
 import "../app.css";
 
 export const Route = createRootRoute({
   loader: async () => {
-    if (!isAuthEnabled()) return;
-
-    const { user } = await getAuth();
-    if (!user) {
-      const signInUrl = await getSignInUrl();
-      throw redirect({ href: signInUrl });
+    const authConfig = await getAuthConfig();
+    if (authConfig.authEnabled) {
+      await requireAuth();
     }
+    return authConfig;
   },
   head: () => ({
     meta: [
@@ -51,16 +49,35 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  const { authEnabled } = Route.useLoaderData();
+
   return (
     <RootDocument>
-      <AuthKitProvider>
+      <AuthShell authEnabled={authEnabled}>
         <div className="flex h-screen bg-kumo-base text-kumo-default font-sans">
-          <Sidebar />
+          <Sidebar authEnabled={authEnabled} />
           <Outlet />
         </div>
-      </AuthKitProvider>
+      </AuthShell>
     </RootDocument>
   );
+}
+
+/**
+ * Wraps children in AuthKitProvider only when auth is enabled.
+ * This avoids the provider making server calls for auth context
+ * when no WorkOS middleware is running.
+ */
+function AuthShell({
+  authEnabled,
+  children,
+}: {
+  authEnabled: boolean;
+  children: ReactNode;
+}) {
+  if (!authEnabled) return <>{children}</>;
+
+  return <AuthKitProvider>{children}</AuthKitProvider>;
 }
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
@@ -77,7 +94,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   );
 }
 
-function Sidebar() {
+function Sidebar({ authEnabled }: { authEnabled: boolean }) {
   const [workflows, setWorkflows] = useState<WorkflowMeta[]>([]);
 
   useEffect(() => {
@@ -117,7 +134,7 @@ function Sidebar() {
           </Link>
         ))}
       </div>
-      <UserFooter />
+      {authEnabled && <UserFooter />}
     </div>
   );
 }
