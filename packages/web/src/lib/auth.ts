@@ -5,12 +5,8 @@
  * This lets the app run without authentication in local dev
  * while enforcing it in deployed environments.
  */
+import { env } from "../env";
 
-/** Whether WorkOS auth is configured. Safe to call on the server only. */
 export function isAuthEnabled(): boolean {
-  try {
-    return !!globalThis?.process?.env?.WORKOS_CLIENT_ID;
-  } catch {
-    return false;
-  }
+  return !!env.WORKOS_CLIENT_ID;
 }
