@@ -40,13 +40,14 @@ On first deploy, Wrangler will create a Pages project called `relay-web`. Note t
 
 ### 3. Configure the frontend
 
-Create `packages/web/.env.production` with your worker URL:
+Set the worker URL as a Cloudflare secret so the web app can proxy API requests:
 
-```
-VITE_RELAY_WORKER_URL=https://relay-tools.your-subdomain.workers.dev
+```bash
+npx wrangler --config packages/web/wrangler.jsonc secret put RELAY_WORKER_URL
+# paste: https://relay-tools.your-subdomain.workers.dev
 ```
 
-Vite loads this file automatically during production builds, so the URL gets baked in when you run `deploy`.
+For local development, this is set in `packages/web/.dev.vars`.
 
 ### 4. Set the app URL on the worker
 

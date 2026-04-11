@@ -1,16 +1,10 @@
 import { getToken } from "./token";
 
-// In dev, falls back to empty string so requests use relative paths (handled by Vite proxy).
-// In production, VITE_RELAY_WORKER_URL is set in .env.production and baked into the build.
-const configuredApiUrl = (import.meta.env.VITE_RELAY_WORKER_URL ?? "")
-  .trim()
-  .replace(/\/+$/, "");
-
+// All worker API requests go through the /worker/ proxy route, which
+// forwards them to RELAY_WORKER_URL on the server side.
 function apiPath(path: string): string {
   const normalizedPath = path.replace(/^\/+/, "");
-  return configuredApiUrl
-    ? `${configuredApiUrl}/${normalizedPath}`
-    : `/${normalizedPath}`;
+  return `/worker/${normalizedPath}`;
 }
 
 // ── App-to-worker auth token cache ────────────────────────────────

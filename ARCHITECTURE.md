@@ -77,7 +77,7 @@ React SPA (React 19, React Router v7, Tailwind v4). Independently deployable. Co
 
 The core hook is `useWorkflowStream` — it manages the full lifecycle of connecting to a run's NDJSON stream, parsing messages with Zod, and exposing state to the UI. Message rendering is driven by the `StreamMessage` discriminated union; the UI never needs to know what workflow it's displaying.
 
-The app is deployed as a TanStack Start SSR app on Cloudflare Workers. Server functions handle auth and token minting (see the Authentication section). All browser → worker API calls go through `apiFetch()` in `lib/api.ts`, which handles URL resolution, token caching, and 401 retry.
+The app is deployed as a TanStack Start SSR app on Cloudflare Workers. Server functions handle auth and token minting (see the Authentication section). All browser → worker API calls go through `apiFetch()` in `lib/api.ts`, which routes them to `/worker/**`. A catch-all API route (`routes/worker/$.tsx`) proxies these requests server-side to `RELAY_WORKER_URL`, so the worker URL is never exposed to the client. `apiFetch()` handles token caching and 401 retry.
 
 ### `apps/examples`
 
@@ -116,6 +116,7 @@ The web app uses **WorkOS AuthKit** for user-facing login. When `WORKOS_CLIENT_I
 - `packages/web/src/lib/auth.ts` — server functions: `getAuthConfig()`, `requireAuth()`
 - `packages/web/src/lib/token.ts` — server function: `getToken()` mints short-lived worker JWTs
 - `packages/web/src/lib/api.ts` — `apiFetch()` wrapper that handles token caching, refresh, and retry on 401
+- `packages/web/src/routes/worker/$.tsx` — catch-all proxy: forwards `/worker/**` to `RELAY_WORKER_URL` server-side
 - `packages/web/src/start.ts` — TanStack Start entry with conditional WorkOS middleware
 - `packages/web/src/routes/api/auth/callback.tsx` — WorkOS OAuth callback route
 

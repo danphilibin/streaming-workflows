@@ -27,8 +27,9 @@ fi
 
 echo ""
 echo "Worker deployed at: $WORKER_URL"
-echo "Building web with VITE_RELAY_WORKER_URL=$WORKER_URL"
 echo ""
 
-# Build and deploy web app — the env var overrides .env.production
-VITE_RELAY_WORKER_URL="$WORKER_URL" pnpm --filter relay-web run deploy
+# Set the worker URL as a Cloudflare secret for the web app, then deploy.
+# The web app proxies API requests to this URL at runtime (not baked into the build).
+echo "$WORKER_URL" | pnpm --filter relay-web exec wrangler secret put RELAY_WORKER_URL
+pnpm --filter relay-web run deploy

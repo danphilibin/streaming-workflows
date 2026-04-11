@@ -2,8 +2,9 @@ import { env as cfEnv } from "cloudflare:workers";
 
 // Values are set via `wrangler secret put` or the Cloudflare dashboard.
 type RelayWebEnv = {
-  // URL of the Relay worker backend.
-  VITE_RELAY_WORKER_URL: string;
+  // URL of the Relay worker backend (set via wrangler secret or .dev.vars).
+  // Server-only — the client proxies through /worker/** instead.
+  RELAY_WORKER_URL: string;
 
   // WorkOS AuthKit — when absent, auth is disabled (local dev).
   WORKOS_CLIENT_ID?: string;
