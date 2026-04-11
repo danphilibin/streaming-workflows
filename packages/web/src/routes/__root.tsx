@@ -1,6 +1,5 @@
 /// <reference types="vite/client" />
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
 import {
   createRootRoute,
   Link,
@@ -13,9 +12,8 @@ import {
   useAuth,
 } from "@workos/authkit-tanstack-react-start/client";
 import { SignOut } from "@phosphor-icons/react";
-import type { WorkflowMeta } from "@relay-tools/sdk/client";
-import { apiFetch } from "../lib/api";
 import { getAuthConfig, requireAuth } from "../lib/auth";
+import { WorkflowsProvider, useWorkflows } from "../lib/workflows-context";
 import "../app.css";
 
 export const Route = createRootRoute({
@@ -54,10 +52,12 @@ function RootComponent() {
   return (
     <RootDocument>
       <AuthShell authEnabled={authEnabled}>
-        <div className="flex h-screen bg-kumo-base text-kumo-default font-sans">
-          <Sidebar authEnabled={authEnabled} />
-          <Outlet />
-        </div>
+        <WorkflowsProvider>
+          <div className="flex h-screen bg-kumo-base text-kumo-default font-sans">
+            <Sidebar authEnabled={authEnabled} />
+            <Outlet />
+          </div>
+        </WorkflowsProvider>
       </AuthShell>
     </RootDocument>
   );
@@ -95,44 +95,41 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
 }
 
 function Sidebar({ authEnabled }: { authEnabled: boolean }) {
-  const [workflows, setWorkflows] = useState<WorkflowMeta[]>([]);
-
-  useEffect(() => {
-    apiFetch("workflows")
-      .then((res) => res.json() as Promise<{ workflows: WorkflowMeta[] }>)
-      .then((data) => setWorkflows(data.workflows))
-      .catch((err) => console.error("Failed to load workflows:", err));
-  }, []);
+  const { workflows, loading, error } = useWorkflows();
 
   const baseClasses =
     "block w-full text-left px-3.5 py-3 rounded-md mb-1 transition-colors";
 
   return (
     <div className="w-[240px] bg-[#0a0a0a] border-r border-[#222] flex flex-col">
-      <div className="p-5 h-16 border-b border-[#222] flex items-center justify-between">
+      <div className="p-5 h-14 border-b border-[#222] flex items-center justify-between">
         <Link
           to="/"
           className="text-base font-semibold tracking-tight flex items-center gap-2"
         >
-          Workflows
+          Relay
         </Link>
       </div>
-      <div className="flex-1 overflow-y-auto p-3">
-        {workflows.map((workflow) => (
-          <Link
-            key={workflow.slug}
-            to="/$workflowName"
-            params={{ workflowName: workflow.slug }}
-            activeProps={{
-              className: `${baseClasses} bg-[#1a1a1a] text-white`,
-            }}
-            inactiveProps={{
-              className: `${baseClasses} text-[#888] hover:bg-[#1a1a1a] hover:text-white`,
-            }}
-          >
-            <div className="font-medium text-sm">{workflow.title}</div>
-          </Link>
-        ))}
+      <div className="flex-1 overflow-y-auto py-3 px-2">
+        {loading || error ? null : workflows.length === 0 ? (
+          <div className="px-3 py-2 text-sm text-[#555]">No workflows</div>
+        ) : (
+          workflows.map((workflow) => (
+            <Link
+              key={workflow.slug}
+              to="/$workflowName"
+              params={{ workflowName: workflow.slug }}
+              activeProps={{
+                className: `${baseClasses} bg-[#1a1a1a] text-white`,
+              }}
+              inactiveProps={{
+                className: `${baseClasses} text-[#888] hover:bg-[#1a1a1a] hover:text-white`,
+              }}
+            >
+              <div className="font-medium text-sm">{workflow.title}</div>
+            </Link>
+          ))
+        )}
       </div>
       {authEnabled && <UserFooter />}
     </div>

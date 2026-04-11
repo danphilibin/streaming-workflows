@@ -1,7 +1,13 @@
 {
-  "name": "relay-web",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@relay-tools/web",
+  "version": "0.1.0",
+  "bin": {
+    "relay-web": "./bin/cli.js"
+  },
+  "files": [
+    "dist",
+    "bin"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite dev",
@@ -19,9 +25,11 @@
     "@tanstack/react-start": "^1.121.3",
     "@tsndr/cloudflare-worker-jwt": "^3.2.1",
     "@workos/authkit-tanstack-react-start": "^0.5.0",
+    "cac": "^6.7.14",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "streamdown": "^2.3.0"
+    "streamdown": "^2.3.0",
+    "wrangler": "^4.77.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.30.1",
@@ -33,7 +41,6 @@
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
     "vite": "^7.1.7",
-    "vite-tsconfig-paths": "^5.1.4",
-    "wrangler": "^4.77.0"
+    "vite-tsconfig-paths": "^5.1.4"
   }
 }

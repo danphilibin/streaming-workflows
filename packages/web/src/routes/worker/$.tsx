@@ -21,15 +21,25 @@ async function proxy({ request }: { request: Request }): Promise<Response> {
   const targetPath = url.pathname.replace(/^\/worker\/?/, "/");
   const targetUrl = `${workerUrl}${targetPath}${url.search}`;
 
-  // Forward the request as-is (method, headers, body).
-  // The Cloudflare Workers runtime handles streaming natively.
-  const proxyResponse = await fetch(targetUrl, {
-    method: request.method,
-    headers: request.headers,
-    body: request.body,
-    // @ts-expect-error — Cloudflare Workers supports duplex streaming
-    duplex: "half",
-  });
+  let proxyResponse: Response;
+  try {
+    // Forward the request as-is (method, headers, body).
+    // The Cloudflare Workers runtime handles streaming natively.
+    proxyResponse = await fetch(targetUrl, {
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+      // @ts-expect-error — Cloudflare Workers supports duplex streaming
+      duplex: "half",
+    });
+  } catch {
+    return new Response(
+      JSON.stringify({
+        error: `Could not connect to worker. Is the worker running?`,
+      }),
+      { status: 502, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
   // Return the response directly, preserving status, headers, and
   // streaming body (important for NDJSON workflow streams).
