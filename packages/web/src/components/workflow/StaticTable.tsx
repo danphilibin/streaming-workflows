@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { LoaderTableData, RowKeyValue } from "relay-sdk/client";
+import type { LoaderTableData, RowKeyValue } from "@relay-tools/sdk/client";
 import { TableDisplay } from "./TableDisplay";
 import { TableToolbar } from "./TableToolbar";
 

@@ -8,8 +8,8 @@
           {
             "patterns": [
               {
-                "group": ["relay-sdk"],
-                "message": "Use relay-sdk/client in the web app — the main export requires Cloudflare Workers."
+                "group": ["@relay-tools/sdk"],
+                "message": "Use @relay-tools/sdk/client in the web app — the main export requires Cloudflare Workers."
               }
             ]
           }

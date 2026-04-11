@@ -1,4 +1,4 @@
-import { createWorkflow, loader } from "relay-sdk";
+import { createWorkflow, loader } from "@relay-tools/sdk";
 
 type Tool = {
   id: string;

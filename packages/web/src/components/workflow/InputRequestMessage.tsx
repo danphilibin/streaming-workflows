@@ -1,5 +1,8 @@
 import { useState, useRef, useCallback } from "react";
-import { type InputSchema, type NormalizedButton } from "relay-sdk/client";
+import {
+  type InputSchema,
+  type NormalizedButton,
+} from "@relay-tools/sdk/client";
 import { Button } from "@cloudflare/kumo/components/button";
 import { FIELD_REGISTRY } from "./SchemaFieldComponents";
 

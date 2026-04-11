@@ -3,7 +3,7 @@ import type {
   NormalizedTableColumn,
   NormalizedTableRow,
   RowKeyValue,
-} from "relay-sdk/client";
+} from "@relay-tools/sdk/client";
 
 interface TableDisplayProps {
   columns: NormalizedTableColumn[];

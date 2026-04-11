@@ -1,4 +1,7 @@
-import { type OutputBlock, type LoaderTableData } from "relay-sdk/client";
+import {
+  type OutputBlock,
+  type LoaderTableData,
+} from "@relay-tools/sdk/client";
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { CodeBlock } from "@cloudflare/kumo/components/code";
 import { Streamdown } from "streamdown";

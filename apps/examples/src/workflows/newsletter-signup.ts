@@ -1,4 +1,4 @@
-import { createWorkflow, field } from "relay-sdk";
+import { createWorkflow, field } from "@relay-tools/sdk";
 
 export const newsletterSignup = createWorkflow({
   name: "Newsletter Signup",

@@ -5,7 +5,7 @@
  *   RELAY_WORKER_URL=http://localhost:8787 npx tsx mcp/server.ts
  */
 
-import { createRelayMcpServer } from "relay-sdk/mcp";
+import { createRelayMcpServer } from "@relay-tools/sdk/mcp";
 
 const server = createRelayMcpServer({
   apiUrl: process.env.RELAY_WORKER_URL || "http://localhost:8787",

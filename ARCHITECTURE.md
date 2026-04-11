@@ -55,9 +55,9 @@ The core SDK. Everything needed to build a Relay-powered Cloudflare Worker.
 
 Three entry points:
 
-- **`relay-sdk`** — Server-side. `createWorkflow`, `RelayExecutor`, `RelayMcpAgent`, `httpHandler`, registry functions.
-- **`relay-sdk/client`** — Browser-safe. Message types, schemas, `parseStreamMessage`. No `cloudflare:workers` dependency.
-- **`relay-sdk/mcp`** — Node.js. `createRelayMcpServer` factory for stdio-based MCP servers.
+- **`@relay-tools/sdk`** — Server-side. `createWorkflow`, `RelayExecutor`, `RelayMcpAgent`, `httpHandler`, registry functions.
+- **`@relay-tools/sdk/client`** — Browser-safe. Message types, schemas, `parseStreamMessage`. No `cloudflare:workers` dependency.
+- **`@relay-tools/sdk/mcp`** — Node.js. `createRelayMcpServer` factory for stdio-based MCP servers.
 
 Internally split into two directories:
 
@@ -81,7 +81,7 @@ The app is deployed as a TanStack Start SSR app on Cloudflare Workers. Server fu
 
 ### `apps/examples`
 
-Example Cloudflare Worker demonstrating the deployment shape: imports `relay-sdk`, defines workflows, deploys independently. Contains several example workflows covering simple to complex cases.
+Example Cloudflare Worker demonstrating the deployment shape: imports `@relay-tools/sdk`, defines workflows, deploys independently. Contains several example workflows covering simple to complex cases.
 
 ### `apps/e2e-tests`
 
@@ -89,11 +89,11 @@ E2e test suite — colocates the test Cloudflare Worker (workflows) and Playwrig
 
 ### `mcp/`
 
-Thin MCP server entrypoint that delegates to `relay-sdk/mcp`. Used for running a local MCP server over stdio.
+Thin MCP server entrypoint that delegates to `@relay-tools/sdk/mcp`. Used for running a local MCP server over stdio.
 
 ## Ground Rules
 
-- **`isomorphic/` has no Cloudflare runtime imports.** Everything in `src/isomorphic/` must be safe to import from both the Worker and the browser. The `relay-sdk/client` entry point re-exports only from this directory.
+- **`isomorphic/` has no Cloudflare runtime imports.** Everything in `src/isomorphic/` must be safe to import from both the Worker and the browser. The `@relay-tools/sdk/client` entry point re-exports only from this directory.
 - **Workflows self-register.** `createWorkflow()` pushes into a global `Map`. There is no manual wiring step — importing a workflow file is sufficient.
 - **Every SDK primitive is a durable step.** `output`, `input`, `loading`, and `confirm` all go through `step.do()`, making them replay-safe. Step results are persisted in DO storage as `step:{name}` keys.
 - **The frontend is workflow-agnostic.** The React app renders any workflow purely from the `StreamMessage` stream. There is no per-workflow UI code.

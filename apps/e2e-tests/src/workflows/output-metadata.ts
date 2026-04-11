@@ -1,4 +1,4 @@
-import { createWorkflow } from "relay-sdk";
+import { createWorkflow } from "@relay-tools/sdk";
 
 /**
  * Tests output.metadata() with label and mixed value types.

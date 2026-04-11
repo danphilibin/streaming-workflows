@@ -1,4 +1,4 @@
-import { createWorkflow } from "relay-sdk";
+import { createWorkflow } from "@relay-tools/sdk";
 
 export const refund = createWorkflow({
   name: "Process Refund",

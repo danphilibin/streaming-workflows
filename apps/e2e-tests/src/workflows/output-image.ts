@@ -1,4 +1,4 @@
-import { createWorkflow } from "relay-sdk";
+import { createWorkflow } from "@relay-tools/sdk";
 
 /**
  * Tests output.image() with src and alt text.

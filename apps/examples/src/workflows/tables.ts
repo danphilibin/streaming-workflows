@@ -1,4 +1,4 @@
-import { createWorkflow, loader } from "relay-sdk";
+import { createWorkflow, loader } from "@relay-tools/sdk";
 import { db, type User, type Order } from "../lib/mock-db";
 
 export const tables = createWorkflow({

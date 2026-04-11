@@ -13,7 +13,7 @@ import {
   useAuth,
 } from "@workos/authkit-tanstack-react-start/client";
 import { SignOut } from "@phosphor-icons/react";
-import type { WorkflowMeta } from "relay-sdk/client";
+import type { WorkflowMeta } from "@relay-tools/sdk/client";
 import { apiFetch } from "../lib/api";
 import { getAuthConfig, requireAuth } from "../lib/auth";
 import "../app.css";

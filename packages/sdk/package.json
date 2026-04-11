@@ -1,14 +1,28 @@
 {
-  "name": "relay-sdk",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@relay-tools/sdk",
+  "version": "0.1.0",
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "exports": {
-    ".": "./src/sdk/index.ts",
-    "./client": "./src/sdk/client.ts",
-    "./mcp": "./src/sdk/mcp/server.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp.d.ts",
+      "import": "./dist/mcp.js"
+    }
   },
   "scripts": {
+    "build": "tsup",
+    "validate": "publint && attw --pack . --profile esm-only",
+    "prepublishOnly": "pnpm build && pnpm validate",
     "test": "vitest run",
     "typecheck": "tsc && tsc -p test/tsconfig.json"
   },
@@ -19,9 +33,12 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.1",
     "@cloudflare/vitest-pool-workers": "^0.13.5",
     "@cloudflare/workers-types": "^4.20250224.0",
     "@types/node": "^22",
+    "publint": "^0.3.12",
+    "tsup": "^8.5.0",
     "typescript": "^5.9.2",
     "vitest": "^4.1.0",
     "wrangler": "^4.56.0"

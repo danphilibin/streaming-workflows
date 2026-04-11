@@ -1,4 +1,4 @@
-import { RelayExecutor, RelayMcpAgent, httpHandler } from "relay-sdk";
+import { RelayExecutor, RelayMcpAgent, httpHandler } from "@relay-tools/sdk";
 
 // Required Cloudflare worker exports
 export { RelayExecutor, RelayMcpAgent };

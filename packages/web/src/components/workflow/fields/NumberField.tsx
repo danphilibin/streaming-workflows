@@ -1,5 +1,5 @@
 import { Input } from "@cloudflare/kumo/components/input";
-import type { InputFieldDefinition } from "relay-sdk/client";
+import type { InputFieldDefinition } from "@relay-tools/sdk/client";
 import type { FieldProps } from "../SchemaFieldComponents";
 
 export function NumberField({

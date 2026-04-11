@@ -1,5 +1,5 @@
 import { Select } from "@cloudflare/kumo/components/select";
-import type { InputFieldDefinition } from "relay-sdk/client";
+import type { InputFieldDefinition } from "@relay-tools/sdk/client";
 import type { FieldProps } from "../SchemaFieldComponents";
 
 export function SelectField({

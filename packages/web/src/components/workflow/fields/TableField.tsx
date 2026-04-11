@@ -1,5 +1,8 @@
 import { useCallback } from "react";
-import type { TableFieldDefinition, RowKeyValue } from "relay-sdk/client";
+import type {
+  TableFieldDefinition,
+  RowKeyValue,
+} from "@relay-tools/sdk/client";
 import type { FieldProps } from "../SchemaFieldComponents";
 import { ServerTable } from "../ServerTable";
 import { StaticTable } from "../StaticTable";

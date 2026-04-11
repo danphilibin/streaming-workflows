@@ -1,4 +1,4 @@
-import { type StreamMessage } from "relay-sdk/client";
+import { type StreamMessage } from "@relay-tools/sdk/client";
 import { InputRequestMessage } from "./InputRequestMessage";
 import { ConfirmRequestMessage } from "./ConfirmRequestMessage";
 import { LoadingMessage } from "./LoadingMessage";

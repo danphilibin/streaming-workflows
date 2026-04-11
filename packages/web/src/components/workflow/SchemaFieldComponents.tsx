@@ -1,4 +1,4 @@
-import type { InputFieldDefinition } from "relay-sdk/client";
+import type { InputFieldDefinition } from "@relay-tools/sdk/client";
 import { TextField } from "./fields/TextField";
 import { NumberField } from "./fields/NumberField";
 import { CheckboxField } from "./fields/CheckboxField";

@@ -108,7 +108,7 @@ claude mcp add relay-tools -e RELAY_WORKER_URL=https://relay-tools.your-subdomai
 Workflows are defined with `createWorkflow()`. The handler receives a context with `input()`, `output()`, `loading()`, and `confirm()` helpers:
 
 ```ts
-import { createWorkflow } from "relay-sdk";
+import { createWorkflow } from "@relay-tools/sdk";
 
 createWorkflow({
   name: "Newsletter Signup",

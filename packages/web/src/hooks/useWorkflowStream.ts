@@ -7,7 +7,7 @@ import {
   parseStreamMessage,
   type StartWorkflowParams,
   type WorkflowParams,
-} from "relay-sdk/client";
+} from "@relay-tools/sdk/client";
 import { apiFetch } from "../lib/api";
 
 interface UseWorkflowStreamOptions {
