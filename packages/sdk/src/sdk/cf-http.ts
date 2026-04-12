@@ -114,18 +114,7 @@ export const httpHandler = async (
   env: Env,
   ctx: ExecutionContext,
 ) => {
-  // Auto-route /mcp when RELAY_MCP_AGENT binding is present.
-  // MCP agent uses Cloudflare DO binding (not HTTP auth), so skip auth here.
-  if (env.RELAY_MCP_AGENT) {
-    const url = new URL(req.url);
-    if (url.pathname.startsWith("/mcp")) {
-      return RelayMcpAgent.serve("/mcp", { binding: "RELAY_MCP_AGENT" }).fetch(
-        req,
-        env,
-        ctx,
-      );
-    }
-  }
+  const url = new URL(req.url);
 
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -144,6 +133,19 @@ export const httpHandler = async (
       return withCors(result);
     }
     // result is the JWT payload — available for future identity claims (R-74)
+  }
+
+  // Auto-route /mcp when RELAY_MCP_AGENT binding is present.
+  // In local dev this remains open when no Relay auth credentials are set.
+  // In production, the auth gate above protects MCP like the rest of the API.
+  if (env.RELAY_MCP_AGENT) {
+    if (url.pathname.startsWith("/mcp")) {
+      return RelayMcpAgent.serve("/mcp", { binding: "RELAY_MCP_AGENT" }).fetch(
+        req,
+        env,
+        ctx,
+      );
+    }
   }
 
   const response = await handleRequest(req, env);

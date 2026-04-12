@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { env } from "cloudflare:workers";
 import { registerWorkflow, getWorkflow } from "../src/sdk/registry";
+import { httpHandler } from "../src/sdk/cf-http";
 import { getExecutor, postToStub } from "./helpers";
 
 /**
@@ -95,5 +97,26 @@ describe("RelayExecutor", () => {
       const lastMessage = result.messages[result.messages.length - 1];
       expect(lastMessage.type).toBe("workflow_complete");
     });
+  });
+});
+
+describe("httpHandler", () => {
+  it("requires auth before routing MCP requests when auth is configured", async () => {
+    const response = await httpHandler(
+      new Request("http://relay.test/mcp"),
+      {
+        ...(env as unknown as Env),
+        RELAY_API_KEY: "test-api-key",
+        // The guard must run before RelayMcpAgent.serve(), so a truthy stub is
+        // enough to catch accidental auth bypasses without opening a real MCP DO.
+        RELAY_MCP_AGENT: {} as DurableObjectNamespace,
+      },
+      {
+        waitUntil() {},
+        passThroughOnException() {},
+      } as unknown as ExecutionContext,
+    );
+
+    expect(response.status).toBe(401);
   });
 });
