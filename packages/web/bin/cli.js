@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import cac from "cac";
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { writeFileSync, rmSync, readFileSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,13 +11,15 @@ import { randomBytes } from "node:crypto";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(__dirname, "..");
 const distServer = resolve(packageRoot, "dist", "server");
+const require = createRequire(import.meta.url);
 
 const pkg = JSON.parse(
   readFileSync(resolve(packageRoot, "package.json"), "utf-8"),
 );
 
-// Resolve the wrangler binary from this package's dependency tree.
-const wrangler = resolve(packageRoot, "node_modules", ".bin", "wrangler");
+// Resolve Wrangler through Node package resolution so the CLI does not depend
+// on a specific package manager's node_modules/.bin layout.
+const wrangler = require.resolve("wrangler/bin/wrangler.js");
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -47,13 +50,26 @@ function writeTempConfig(config) {
 }
 
 /** Run a command, forwarding stdio. Cleans up the temp config on exit. */
-function run(command, configPath) {
+function run(command, args, configPath) {
+  let result;
   try {
-    execSync(command, { stdio: "inherit" });
+    result = spawnSync(command, args, { stdio: "inherit" });
   } finally {
     try {
       rmSync(configPath, { force: true });
     } catch {}
+  }
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if (result.signal) {
+    throw new Error(`Command terminated by signal ${result.signal}`);
+  }
+
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
   }
 }
 
@@ -73,7 +89,11 @@ cli
       vars: { RELAY_WORKER_URL: workerUrl },
     });
     const configPath = writeTempConfig(config);
-    run(`${wrangler} dev --config ${configPath} --port ${port}`, configPath);
+    run(
+      process.execPath,
+      [wrangler, "dev", "--config", configPath, "--port", String(port)],
+      configPath,
+    );
   });
 
 cli
@@ -82,7 +102,11 @@ cli
   .action(({ name }) => {
     const config = generateConfig({ name });
     const configPath = writeTempConfig(config);
-    run(`${wrangler} deploy --config ${configPath}`, configPath);
+    run(
+      process.execPath,
+      [wrangler, "deploy", "--config", configPath],
+      configPath,
+    );
     console.log("");
     console.log("Set the worker URL (if not already configured):");
     console.log(`  npx wrangler secret put RELAY_WORKER_URL --name ${name}`);
